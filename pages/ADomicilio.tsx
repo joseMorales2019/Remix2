@@ -83,9 +83,21 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [openOnlyFilter, setOpenOnlyFilter] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isStandalone, setIsStandalone] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
   const [selectedImageForView, setSelectedImageForView] = useState<string | null>(null);
 
   useEffect(() => {
+    // Detect standalone mode
+    if (window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone) {
+      setIsStandalone(true);
+    }
+
+    // Detect iOS
+    const ua = window.navigator.userAgent;
+    const isIosDevice = /iPad|iPhone|iPod/.test(ua) && !(window as any).MSStream;
+    setIsIOS(isIosDevice);
+
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -95,11 +107,16 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
   }, []);
 
   const handleInstallApp = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setDeferredPrompt(null);
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+      }
+    } else if (isIOS) {
+      showToast('📲 Para instalar: Toca "Compartir" y luego "Agregar a Inicio"');
+    } else {
+      showToast('⚙️ Abre este sitio en Chrome para poder descargar la aplicación.');
     }
   };
 
@@ -1461,7 +1478,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
               </p>
             </div>
 
-            {deferredPrompt && (
+            {(!isStandalone && (deferredPrompt || isIOS)) && (
               <motion.button
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
@@ -1617,7 +1634,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
         {activeTab === 'explore' && (
           <div className="space-y-5 flex-grow flex flex-col">
             {/* PWA Install Banner */}
-            {deferredPrompt && (
+            {(!isStandalone && (deferredPrompt || isIOS)) && (
               <motion.div 
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
