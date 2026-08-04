@@ -26,6 +26,8 @@ import {
   Share2,
   Navigation,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   Sparkles,
   ArrowRight,
   Upload,
@@ -379,6 +381,14 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
   const [orderAddressInput, setOrderAddressInput] = useState('');
   const [isOrderingModalOpen, setIsOrderingModalOpen] = useState(false);
   const [orderSuccessOrder, setOrderSuccessOrder] = useState<DomicilioOrder | null>(null);
+  const [expandedOrders, setExpandedOrders] = useState<Record<string, boolean>>({});
+
+  const toggleOrderExpansion = (orderId: string) => {
+    setExpandedOrders((prev) => ({
+      ...prev,
+      [orderId]: !prev[orderId]
+    }));
+  };
 
   // Customer Registration Modal
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
@@ -1148,6 +1158,33 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
     updateOrders([newOrder, ...orders]);
     notifiedOrdersRef.current.add(newOrder.id);
     sendOrderPushNotification(newOrder, biz.business_name);
+    
+    // Enviar información del pedido al WhatsApp del dueño del negocio
+    if (biz.phone) {
+      const itemsDetail = newOrder.items.map(item => `- ${item.quantity}x ${item.product_name} ($${item.unit_price.toFixed(2)} c/u) = $${item.subtotal.toFixed(2)}`).join('\n');
+      
+      const whatsappMsg = `*NUEVO PEDIDO - NewBank AI*\n` +
+        `---------------------------\n` +
+        `*Cliente:* ${newOrder.customer_name}\n` +
+        `*Teléfono:* ${newOrder.customer_phone}\n` +
+        `*Dirección:* ${newOrder.customer_address}\n` +
+        `*Entrega:* ${newOrder.delivery_type === 'domicilio' ? 'A Domicilio 🛵' : 'Retiro en Tienda 🏬'}\n` +
+        `*Fecha:* ${newOrder.order_date} ${newOrder.order_time}\n\n` +
+        `*DETALLE:*\n${itemsDetail}\n\n` +
+        `*TOTAL:* $${newOrder.total.toFixed(2)}\n` +
+        `${newOrder.additional_note ? `*Nota:* ${newOrder.additional_note}\n` : ''}` +
+        `---------------------------\n` +
+        `*Ubicación del Cliente:* https://www.google.com/maps?q=${newOrder.customer_latitude},${newOrder.customer_longitude}`;
+
+      // Limpiar el número de teléfono (solo dígitos)
+      const cleanPhone = biz.phone.replace(/\D/g, '');
+      // Si el número tiene 8 dígitos (formato SV sin código), añadir 503
+      const finalPhone = cleanPhone.length === 8 ? `503${cleanPhone}` : cleanPhone;
+      
+      const waUrl = `https://wa.me/${finalPhone}?text=${encodeURIComponent(whatsappMsg)}`;
+      window.open(waUrl, '_blank');
+    }
+
     showToast(`🔔 ¡Pedido realizado! Notificación Push emitida a ${biz.business_name}`);
     setOrderSuccessOrder(newOrder);
     setCart({});
@@ -1371,7 +1408,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
   const managingBiz = myManageableBusinesses.find((b) => b.id === managingBusinessId);
 
   return (
-    <div className="min-h-screen bg-[#faf8f5] text-stone-900 pb-20 font-sans">
+    <div className="min-h-screen bg-[#faf8f5] text-stone-900 pb-4 font-sans flex flex-col">
       {/* Toast Notification */}
       <AnimatePresence>
         {toastMessage && (
@@ -1538,17 +1575,14 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
       </div>
 
       {/* Main Container Content */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 mt-5">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 mt-5 flex-grow flex flex-col w-full">
 
         {/* TAB 1: VISUALIZACIÓN EN EL MAPA Y TARJETAS DE NEGOCIOS (Requirements 5 & 6) */}
         {activeTab === 'explore' && (
-          <div className="space-y-5">
+          <div className="space-y-5 flex-grow flex flex-col">
             {/* Search & Filter Header */}
-            <motion.div
-              drag
-              dragElastic={0.12}
-              whileTap={{ cursor: 'grabbing' }}
-              className="bg-white rounded-2xl p-3.5 sm:p-5 shadow-sm border border-amber-200/70 flex flex-col md:flex-row md:items-center justify-between gap-3 cursor-grab"
+            <div
+              className="bg-white rounded-2xl p-3.5 sm:p-5 shadow-sm border border-amber-200/70 flex flex-col md:flex-row md:items-center justify-between gap-3"
             >
               <div className="flex-1 relative">
                 <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400" />
@@ -1574,14 +1608,11 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                   {openOnlyFilter ? 'Mostrando Solo Abiertos' : 'Ver Solo Abiertos'}
                 </button>
               </div>
-            </motion.div>
+            </div>
 
             {/* Amplified Interactive Map Canvas Visualization (Requirement 5) */}
-            <motion.div
-              drag
-              dragElastic={0.12}
-              whileTap={{ cursor: 'grabbing' }}
-              className="bg-stone-900 rounded-2xl text-white shadow-xl border border-stone-800 overflow-hidden relative cursor-grab h-[360px] xs:h-[420px] sm:h-[543.55px]"
+            <div
+              className="bg-stone-900 rounded-2xl text-white shadow-xl border border-stone-800 overflow-hidden relative flex-grow min-h-[500px] sm:min-h-[600px] mb-4"
               style={{
                 borderStyle: 'dashed',
                 borderRadius: '11px',
@@ -1617,7 +1648,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                 <div
                   ref={mapContainerRef}
                   className="w-full h-full rounded-xl z-0"
-                  style={{ minHeight: '200px', height: '100%' }}
+                  style={{ minHeight: '200px', height: '515px' }}
                 />
 
                 {/* Tarjeta flotante sobre el mapa al seleccionar un negocio */}
@@ -1631,9 +1662,9 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                       drag
                       dragElastic={0.12}
                       whileTap={{ cursor: 'grabbing' }}
-                      className="absolute top-2 left-2 z-[9999] w-72 max-w-[calc(100%-1rem)] bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-amber-200 text-stone-900 overflow-hidden flex flex-col cursor-grab"
+                      className="absolute top-2 left-2 z-[9999] w-72 max-w-[calc(100%-1rem)] max-h-[calc(100%-1rem)] bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-amber-200 text-stone-900 overflow-hidden flex flex-col cursor-grab"
                     >
-                      <div className="p-2.5 border-b border-amber-100 bg-amber-50/70 flex items-start justify-between gap-1.5">
+                      <div className="p-2.5 border-b border-amber-100 bg-amber-50/70 flex items-start justify-between gap-1.5 shrink-0">
                         <div className="min-w-0">
                           <h3 className="text-xs sm:text-sm font-black text-stone-900 leading-tight truncate">
                             {b.business_name}
@@ -1652,84 +1683,87 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                         </button>
                       </div>
 
-                      <div className="p-2.5 space-y-1.5 text-[10px] sm:text-xs text-stone-700">
-                        <div className="flex items-center justify-between">
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
-                              openStatus.isOpen
-                                ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
-                                : 'bg-rose-100 text-rose-900 border border-rose-300'
-                            }`}
-                          >
-                            {openStatus.isOpen ? 'Abierto' : 'Cerrado'}
-                          </span>
-                          {b.delivery_paused && (
-                            <span className="px-1.5 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded text-[8px] font-black uppercase tracking-wider">
-                              🔴 Sin Envíos
+                      {/* Cuerpo medio deslizable para ajuste responsivo en pantallas pequeñas */}
+                      <div className="flex-1 overflow-y-auto min-h-0 space-y-1.5">
+                        <div className="p-2.5 space-y-1.5 text-[10px] sm:text-xs text-stone-700">
+                          <div className="flex items-center justify-between">
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                                openStatus.isOpen
+                                  ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
+                                  : 'bg-rose-100 text-rose-900 border border-rose-300'
+                              }`}
+                            >
+                              {openStatus.isOpen ? 'Abierto' : 'Cerrado'}
                             </span>
-                          )}
+                            {b.delivery_paused && (
+                              <span className="px-1.5 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded text-[8px] font-black uppercase tracking-wider">
+                                🔴 Sin Envíos
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-amber-600 shrink-0" />
+                            <span className="font-semibold text-stone-800 truncate">{openStatus.label}</span>
+                          </p>
+                          <p className="flex items-center gap-1">
+                            <Phone className="w-3 h-3 text-amber-600 shrink-0" />
+                            <span><strong>{b.phone}</strong></span>
+                          </p>
+                          <p className="flex items-center gap-1">
+                            <MapPin className="w-3 h-3 text-red-600 shrink-0" />
+                            <span className="truncate">{b.address_text || 'Ubicación GPS registrada'}</span>
+                          </p>
                         </div>
 
-                        <p className="flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-amber-600 shrink-0" />
-                          <span className="font-semibold text-stone-800 truncate">{openStatus.label}</span>
-                        </p>
-                        <p className="flex items-center gap-1">
-                          <Phone className="w-3 h-3 text-amber-600 shrink-0" />
-                          <span><strong>{b.phone}</strong></span>
-                        </p>
-                        <p className="flex items-center gap-1">
-                          <MapPin className="w-3 h-3 text-red-600 shrink-0" />
-                          <span className="truncate">{b.address_text || 'Ubicación GPS registrada'}</span>
-                        </p>
-                      </div>
+                        {/* List of Products inside floating card */}
+                        <div className="px-2.5 py-1.5 max-h-24 sm:max-h-40 overflow-y-auto space-y-1.5 border-t border-amber-100">
+                          <div className="flex items-center justify-between text-[9px] font-bold text-stone-500 uppercase tracking-wider mb-0.5">
+                            <span>Productos ({bizProducts.length})</span>
+                            <span>Envío</span>
+                          </div>
 
-                      {/* List of Products inside floating card */}
-                      <div className="px-2.5 py-1.5 max-h-24 sm:max-h-40 overflow-y-auto space-y-1.5 border-t border-amber-100">
-                        <div className="flex items-center justify-between text-[9px] font-bold text-stone-500 uppercase tracking-wider mb-0.5">
-                          <span>Productos ({bizProducts.length})</span>
-                          <span>Envío</span>
-                        </div>
+                          {bizProducts.map((p) => (
+                            <div
+                              key={p.id}
+                              className="flex items-center justify-between p-1.5 rounded-lg bg-amber-50/40 hover:bg-amber-100/50 border border-amber-100 transition text-[10px]"
+                            >
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <img
+                                  src={p.image_url}
+                                  alt={p.name}
+                                  className="w-7 h-7 rounded object-cover border border-amber-200"
+                                />
+                                <div className="min-w-0">
+                                  <p className="font-extrabold text-stone-900 truncate leading-tight">{p.name}</p>
+                                  <p className="text-red-700 font-black text-[9px]">${p.price.toFixed(2)}</p>
+                                </div>
+                              </div>
 
-                        {bizProducts.map((p) => (
-                          <div
-                            key={p.id}
-                            className="flex items-center justify-between p-1.5 rounded-lg bg-amber-50/40 hover:bg-amber-100/50 border border-amber-100 transition text-[10px]"
-                          >
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <img
-                                src={p.image_url}
-                                alt={p.name}
-                                className="w-7 h-7 rounded object-cover border border-amber-200"
-                              />
-                              <div className="min-w-0">
-                                <p className="font-extrabold text-stone-900 truncate leading-tight">{p.name}</p>
-                                <p className="text-red-700 font-black text-[9px]">${p.price.toFixed(2)}</p>
+                              <div>
+                                {p.disponible_domicilio ? (
+                                  <span className="px-1 py-0.5 rounded bg-emerald-100 text-emerald-900 font-bold text-[8px] flex items-center gap-0.5">
+                                    <Truck className="w-2 h-2 text-emerald-700" /> Domicilio
+                                  </span>
+                                ) : (
+                                  <span className="px-1 py-0.5 rounded bg-amber-100 text-amber-900 font-bold text-[8px] flex items-center gap-0.5">
+                                    <Store className="w-2 h-2 text-amber-700" /> Local
+                                  </span>
+                                )}
                               </div>
                             </div>
+                          ))}
 
-                            <div>
-                              {p.disponible_domicilio ? (
-                                <span className="px-1 py-0.5 rounded bg-emerald-100 text-emerald-900 font-bold text-[8px] flex items-center gap-0.5">
-                                  <Truck className="w-2 h-2 text-emerald-700" /> Domicilio
-                                </span>
-                              ) : (
-                                <span className="px-1 py-0.5 rounded bg-amber-100 text-amber-900 font-bold text-[8px] flex items-center gap-0.5">
-                                  <Store className="w-2 h-2 text-amber-700" /> Local
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-
-                        {bizProducts.length === 0 && (
-                          <p className="text-[10px] text-stone-400 italic text-center py-1">
-                            Sin productos.
-                          </p>
-                        )}
+                          {bizProducts.length === 0 && (
+                            <p className="text-[10px] text-stone-400 italic text-center py-1">
+                              Sin productos.
+                            </p>
+                          )}
+                        </div>
                       </div>
 
-                      <div className="p-2 bg-amber-50/60 border-t border-amber-100 flex flex-wrap sm:flex-nowrap gap-1.5">
+                      <div className="p-2 bg-amber-50/60 border-t border-amber-100 flex flex-wrap sm:flex-nowrap gap-1.5 shrink-0">
                         <button
                           onClick={() => {
                             setOrderingBusiness(b);
@@ -1774,17 +1808,14 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                   {isLocatingUser ? 'Obteniendo GPS...' : 'Ir a mi ubicación actual'}
                 </button>
               </div>
-            </motion.div>
+            </div>
           </div>
         )}
 
         {/* TAB 2: REGISTRO DE NEGOCIOS (Requirement 1) */}
         {activeTab === 'register_business' && (
-          <motion.div
-            drag
-            dragElastic={0.12}
-            whileTap={{ cursor: 'grabbing' }}
-            className="max-w-3xl mx-auto bg-white rounded-2xl p-4 sm:p-6 md:p-8 shadow-sm border border-amber-200/70 cursor-grab"
+          <div
+            className="max-w-3xl mx-auto bg-white rounded-2xl p-4 sm:p-6 md:p-8 shadow-sm border border-amber-200/70"
           >
             <div className="border-b border-amber-100 pb-3.5 mb-5">
               <h2 className="text-xl sm:text-2xl font-black text-stone-900 flex items-center gap-2">
@@ -2037,18 +2068,15 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                 Completar Registro de Negocio
               </button>
             </form>
-          </motion.div>
+          </div>
         )}
 
         {/* TAB 3: VER PRODUCTOS REGISTRADOS Y HORARIOS (Requirement 2 & 4 & 7) */}
         {activeTab === 'manage_products' && (
           <div className="space-y-6">
             {myManageableBusinesses.length === 0 ? (
-              <motion.div
-                drag
-                dragElastic={0.12}
-                whileTap={{ cursor: 'grabbing' }}
-                className="bg-white rounded-3xl p-12 text-center border border-slate-200 shadow-sm space-y-4 max-w-xl mx-auto my-12 cursor-grab"
+              <div
+                className="bg-white rounded-3xl p-12 text-center border border-slate-200 shadow-sm space-y-4 max-w-xl mx-auto my-12"
               >
                 <Store className="w-16 h-16 mx-auto text-blue-500" />
                 <h3 className="text-xl font-black text-slate-900">No tienes negocios registrados</h3>
@@ -2061,15 +2089,12 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                 >
                   Registrar mi Negocio Ahora
                 </button>
-              </motion.div>
+              </div>
             ) : (
               <>
                 {/* Business Selector */}
-                <motion.div
-                  drag
-                  dragElastic={0.12}
-                  whileTap={{ cursor: 'grabbing' }}
-                  className="bg-white rounded-2xl p-3.5 sm:p-5 border border-amber-200/70 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-grab"
+                <div
+                  className="bg-white rounded-2xl p-3.5 sm:p-5 border border-amber-200/70 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                 >
                   <div>
                     <label className="block text-xs font-extrabold uppercase text-stone-600 mb-1">
@@ -2132,17 +2157,14 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                       </button>
                     </div>
                   )}
-                </motion.div>
+                </div>
 
             {managingBiz && (
               <>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                 {/* Visualizar Horarios Registrados del Negocio (Requirement 4) */}
-                <motion.div
-                  drag
-                  dragElastic={0.12}
-                  whileTap={{ cursor: 'grabbing' }}
-                  className="bg-white rounded-2xl p-4 sm:p-5 border border-amber-200/70 shadow-sm space-y-3.5 cursor-grab"
+                <div
+                  className="bg-white rounded-2xl p-4 sm:p-5 border border-amber-200/70 shadow-sm space-y-3.5"
                 >
                   <h3 className="font-black text-stone-900 border-b border-amber-100 pb-2 flex items-center gap-2 text-sm sm:text-base">
                     <Clock className="w-4 h-4 text-amber-600" /> Horarios del Negocio
@@ -2233,14 +2255,11 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                       </div>
                     </label>
                   </div>
-                </motion.div>
+                </div>
 
                 {/* Listado de Productos Registrados (Requirement 4) */}
-                <motion.div
-                  drag
-                  dragElastic={0.12}
-                  whileTap={{ cursor: 'grabbing' }}
-                  className="lg:col-span-2 bg-white rounded-2xl p-4 sm:p-5 border border-amber-200/70 shadow-sm space-y-3.5 cursor-grab"
+                <div
+                  className="lg:col-span-2 bg-white rounded-2xl p-4 sm:p-5 border border-amber-200/70 shadow-sm space-y-3.5"
                 >
                   <div className="flex items-center justify-between border-b border-amber-100 pb-3">
                     <h3 className="font-black text-stone-900 flex items-center gap-2 text-sm sm:text-base">
@@ -2255,12 +2274,9 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                     {products
                       .filter((p) => p.business_id === managingBiz.id)
                       .map((p) => (
-                        <motion.div
-                          drag
-                          dragElastic={0.12}
-                          whileTap={{ cursor: 'grabbing' }}
+                        <div
                           key={p.id}
-                          className={`p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition cursor-grab ${
+                          className={`p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition ${
                             p.is_hidden ? 'bg-stone-100/70 border-stone-300 opacity-75' : 'bg-white border-amber-200/80 shadow-xs'
                           }`}
                         >
@@ -2321,7 +2337,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
-                        </motion.div>
+                        </div>
                       ))}
 
                     {products.filter((p) => p.business_id === managingBiz.id).length === 0 && (
@@ -2330,15 +2346,12 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                       </p>
                     )}
                   </div>
-                </motion.div>
+                </div>
               </div>
 
               {/* Opción para ver los productos solicitados al negocio y controlar las entregas (Requirement 3 & 4) */}
-              <motion.div
-                drag
-                dragElastic={0.12}
-                whileTap={{ cursor: 'grabbing' }}
-                className="bg-white rounded-2xl p-4 sm:p-5 border border-amber-200/70 shadow-sm space-y-4 cursor-grab"
+              <div
+                className="bg-white rounded-2xl p-4 sm:p-5 border border-amber-200/70 shadow-sm space-y-4"
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-100 pb-3">
                   <div>
@@ -2377,80 +2390,118 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                           ord.customer_latitude,
                           ord.customer_longitude
                         );
+                        const isExpanded = !!expandedOrders[ord.id];
                         return (
                           <div
                             key={ord.id}
-                            className="p-4 rounded-xl border border-amber-200/80 bg-stone-50/40 hover:bg-amber-50/20 transition space-y-3"
+                            className="p-3.5 sm:p-4 rounded-xl border border-amber-200/80 bg-stone-50/40 hover:bg-amber-50/20 transition space-y-3 w-full"
                           >
-                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-200 pb-2.5">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="px-2.5 py-0.5 bg-amber-500 text-stone-950 font-black text-xs rounded-md">
+                            <div
+                              onClick={() => toggleOrderExpansion(ord.id)}
+                              className="flex items-center justify-between gap-2 border-b border-stone-200 pb-2.5 cursor-pointer select-none"
+                              title="Haga clic para expandir o contraer detalles"
+                            >
+                              <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                                <span className="px-2 py-0.5 bg-amber-500 text-stone-950 font-black text-[10px] sm:text-xs rounded-md shrink-0">
                                   Pedido #{ord.id.substring(4)}
                                 </span>
-                                <span className="font-extrabold text-stone-900 text-xs sm:text-sm">{ord.customer_name}</span>
-                                <span className="text-xs text-stone-600 font-semibold">📞 {ord.customer_phone}</span>
-                              </div>
-
-                              <div className="flex items-center gap-2">
-                                <span className="px-2.5 py-1 bg-red-50 text-red-900 border border-red-200 rounded-full font-bold text-xs flex items-center gap-1">
-                                  <MapPin className="w-3.5 h-3.5 text-red-600" /> A {distKm} km
+                                <span className="font-extrabold text-stone-900 text-xs sm:text-sm truncate max-w-[100px] sm:max-w-[160px]">
+                                  {ord.customer_name}
                                 </span>
-                                <button
-                                  onClick={() => {
-                                    const updated = orders.map((o) =>
-                                      o.id === ord.id
-                                        ? { ...o, status: o.status === 'Pendiente' ? ('Entregado' as const) : ('Pendiente' as const) }
-                                        : o
-                                    );
-                                    updateOrders(updated);
-                                    showToast('✅ Estado de la entrega actualizado');
-                                  }}
-                                  className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider transition ${
-                                    ord.status === 'Pendiente'
-                                      ? 'bg-amber-100 text-amber-950 hover:bg-amber-200 border border-amber-300'
-                                      : 'bg-emerald-100 text-emerald-950 hover:bg-emerald-200 border border-emerald-300'
-                                  }`}
-                                >
-                                  {ord.status === 'Pendiente' ? '⏳ Pendiente' : '✅ Entregado'}
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Detalle de Productos Solicitados */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                              <div className="space-y-1 bg-white p-2.5 rounded-lg border border-stone-200">
-                                <p className="font-extrabold text-stone-800 uppercase text-[10px] text-amber-800">Productos Solicitados:</p>
-                                {ord.items.map((it, idx) => (
-                                  <div key={idx} className="flex justify-between font-bold text-stone-900 text-xs">
-                                    <span>{it.quantity}x {it.product_name}</span>
-                                    <span className="text-red-700">${(it.subtotal || it.unit_price * it.quantity).toFixed(2)}</span>
-                                  </div>
-                                ))}
-                                <div className="pt-1.5 border-t border-stone-100 flex justify-between font-black text-xs text-stone-950">
-                                  <span>Total del Pedido:</span>
-                                  <span className="text-red-700 text-sm">${ord.total.toFixed(2)}</span>
-                                </div>
+                                <span className="text-[10px] sm:text-xs text-stone-600 font-semibold shrink-0">
+                                  📞 {ord.customer_phone}
+                                </span>
                               </div>
 
-                              <div className="space-y-1 bg-white p-2.5 rounded-lg border border-stone-200">
-                                <p className="font-extrabold text-stone-800 uppercase text-[10px] text-amber-800">Dirección & Tipo de Entrega:</p>
-                                <p className="text-stone-800 font-semibold">{ord.customer_address}</p>
-                                <p className="text-[11px] text-stone-600">
-                                  Tipo: <strong className="text-stone-900 uppercase">{ord.delivery_type}</strong> | Fecha: <strong>{ord.order_date} ({ord.order_time})</strong>
-                                </p>
-                                {ord.additional_note && (
-                                  <p className="text-[11px] text-amber-900 bg-amber-50 p-1.5 rounded border border-amber-200 italic">
-                                    Nota: "{ord.additional_note}"
-                                  </p>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <span className="text-[11px] font-bold text-amber-700 hidden sm:inline">
+                                  {isExpanded ? 'Contraer' : 'Ver detalle'}
+                                </span>
+                                {isExpanded ? (
+                                  <ChevronUp className="w-4 h-4 text-amber-700 shrink-0" />
+                                ) : (
+                                  <ChevronDown className="w-4 h-4 text-amber-700 shrink-0" />
                                 )}
                               </div>
                             </div>
+
+                            {/* Info Summary Row (Always Visible) */}
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="px-2 py-0.5 bg-red-50 text-red-900 border border-red-200 rounded-full font-bold text-[10px] sm:text-xs flex items-center gap-1 shrink-0">
+                                <MapPin className="w-3 h-3 text-red-600" /> A {distKm} km
+                              </span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const updated = orders.map((o) =>
+                                    o.id === ord.id
+                                      ? { ...o, status: o.status === 'Pendiente' ? ('Entregado' as const) : ('Pendiente' as const) }
+                                      : o
+                                  );
+                                  updateOrders(updated);
+                                  showToast('✅ Estado de la entrega actualizado');
+                                }}
+                                className={`px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full text-[10px] sm:text-xs font-black uppercase tracking-wider transition shrink-0 ${
+                                  ord.status === 'Pendiente'
+                                    ? 'bg-amber-100 text-amber-950 hover:bg-amber-200 border border-amber-300'
+                                    : 'bg-emerald-100 text-emerald-950 hover:bg-emerald-200 border border-emerald-300'
+                                }`}
+                              >
+                                {ord.status === 'Pendiente' ? '⏳ Pendiente' : '✅ Entregado'}
+                              </button>
+                            </div>
+
+                            {/* Detalle de Productos Solicitados y Dirección - Accordion */}
+                            <AnimatePresence initial={false}>
+                              {isExpanded && (
+                                <motion.div
+                                  initial={{ height: 0, opacity: 0 }}
+                                  animate={{ height: 'auto', opacity: 1 }}
+                                  exit={{ height: 0, opacity: 0 }}
+                                  transition={{ duration: 0.2 }}
+                                  className="overflow-hidden w-full"
+                                >
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs pt-2.5 border-t border-stone-100">
+                                    <div className="space-y-1 bg-white p-2.5 rounded-lg border border-stone-200">
+                                      <p className="font-extrabold text-stone-800 uppercase text-[9px] sm:text-[10px] text-amber-800">
+                                        Productos Solicitados:
+                                      </p>
+                                      {ord.items.map((it, idx) => (
+                                        <div key={idx} className="flex justify-between font-bold text-stone-900 text-xs">
+                                          <span>{it.quantity}x {it.product_name}</span>
+                                          <span className="text-red-700">${(it.subtotal || it.unit_price * it.quantity).toFixed(2)}</span>
+                                        </div>
+                                      ))}
+                                      <div className="pt-1.5 border-t border-stone-100 flex justify-between font-black text-xs text-stone-950">
+                                        <span>Total del Pedido:</span>
+                                        <span className="text-red-700 text-sm">${ord.total.toFixed(2)}</span>
+                                      </div>
+                                    </div>
+
+                                    <div className="space-y-1 bg-white p-2.5 rounded-lg border border-stone-200">
+                                      <p className="font-extrabold text-stone-800 uppercase text-[9px] sm:text-[10px] text-amber-800">
+                                        Dirección & Tipo de Entrega:
+                                      </p>
+                                      <p className="text-stone-800 font-semibold">{ord.customer_address}</p>
+                                      <p className="text-[10px] sm:text-[11px] text-stone-600">
+                                        Tipo: <strong className="text-stone-900 uppercase">{ord.delivery_type}</strong> | Fecha: <strong>{ord.order_date} ({ord.order_time})</strong>
+                                      </p>
+                                      {ord.additional_note && (
+                                        <p className="text-[10px] sm:text-[11px] text-amber-900 bg-amber-50 p-1.5 rounded border border-amber-200 italic">
+                                          Nota: "{ord.additional_note}"
+                                        </p>
+                                      )}
+                                    </div>
+                                  </div>
+                                </motion.div>
+                              )}
+                            </AnimatePresence>
                           </div>
                         );
                       })
                   )}
                 </div>
-              </motion.div>
+              </div>
               </>
             )}
             </>
@@ -2462,11 +2513,8 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
         {activeTab === 'view_orders' && (
           <div className="space-y-5">
             {/* Header & Filters */}
-            <motion.div
-              drag
-              dragElastic={0.12}
-              whileTap={{ cursor: 'grabbing' }}
-              className="bg-white rounded-2xl p-3.5 sm:p-5 border border-amber-200/70 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3 cursor-grab"
+            <div
+              className="bg-white rounded-2xl p-3.5 sm:p-5 border border-amber-200/70 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3"
             >
               <div>
                 <h2 className="text-lg sm:text-xl font-black text-stone-900 flex items-center gap-2">
@@ -2534,39 +2582,58 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                   )}
                 </div>
               </div>
-            </motion.div>
+            </div>
 
             {/* List of Orders (Requirement 3) */}
             <div className="space-y-4">
-              {currentBizOrders.map((ord) => (
-                <motion.div
-                  drag
-                  dragElastic={0.12}
-                  whileTap={{ cursor: 'grabbing' }}
-                  key={ord.id}
-                  className="bg-white rounded-2xl p-4 sm:p-5 border border-amber-200/70 shadow-sm space-y-3.5 cursor-grab"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-100 pb-3">
-                    <div className="flex items-center gap-2.5 flex-wrap">
-                      <span className="px-2.5 py-1 bg-amber-100 text-amber-950 font-black text-xs rounded-full border border-amber-300">
-                        #{ord.id.substring(4)}
-                      </span>
-                      <span className="px-2.5 py-0.5 bg-red-100 text-red-950 border border-red-300 font-extrabold text-xs rounded-md flex items-center gap-1">
-                        <Store className="w-3.5 h-3.5 text-red-700" /> {ord.business_name}
-                      </span>
-                      <h3 className="font-extrabold text-stone-900 text-sm sm:text-base">{ord.customer_name}</h3>
-                      <span className="text-xs text-stone-600 font-medium">({ord.customer_phone})</span>
+              {currentBizOrders.map((ord) => {
+                const isExpanded = !!expandedOrders[ord.id];
+                return (
+                  <div
+                    key={ord.id}
+                    className="bg-white rounded-2xl p-4 sm:p-5 border border-amber-200/70 shadow-sm space-y-3.5 w-full"
+                  >
+                    <div
+                      onClick={() => toggleOrderExpansion(ord.id)}
+                      className="flex items-center justify-between gap-2 border-b border-amber-100 pb-3 cursor-pointer select-none"
+                      title="Haga clic para expandir o contraer detalles"
+                    >
+                      <div className="flex items-center gap-2 flex-wrap min-w-0">
+                        <span className="px-2.5 py-1 bg-amber-100 text-amber-950 font-black text-xs rounded-full border border-amber-300 shrink-0">
+                          #{ord.id.substring(4)}
+                        </span>
+                        <span className="px-2.5 py-0.5 bg-red-100 text-red-950 border border-red-300 font-extrabold text-xs rounded-md flex items-center gap-1 shrink-0">
+                          <Store className="w-3.5 h-3.5 text-red-700" /> {ord.business_name}
+                        </span>
+                        <h3 className="font-extrabold text-stone-900 text-sm sm:text-base truncate max-w-[100px] sm:max-w-[160px]">
+                          {ord.customer_name}
+                        </h3>
+                        <span className="text-xs text-stone-600 font-medium shrink-0">({ord.customer_phone})</span>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="text-xs font-bold text-amber-700 hidden sm:inline">
+                          {isExpanded ? 'Contraer' : 'Ver detalle'}
+                        </span>
+                        {isExpanded ? (
+                          <ChevronUp className="w-4 h-4 text-amber-700 shrink-0" />
+                        ) : (
+                          <ChevronDown className="w-4 h-4 text-amber-700 shrink-0" />
+                        )}
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    {/* ALWAYS VISIBLE INFO BAR */}
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       {/* Distance Badge */}
-                      <span className="px-2.5 py-1 bg-red-50 text-red-900 border border-red-200 rounded-full font-bold text-xs flex items-center gap-1">
+                      <span className="px-2.5 py-1 bg-red-50 text-red-900 border border-red-200 rounded-full font-bold text-xs flex items-center gap-1 shrink-0">
                         <MapPin className="w-3.5 h-3.5 text-red-600" /> A {ord.distance_km} km de distancia
                       </span>
 
                       {/* Status Toggle Button (Requirement 3) */}
                       <button
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           const updated = orders.map((o) =>
                             o.id === ord.id
                               ? { ...o, status: o.status === 'Pendiente' ? ('Entregado' as const) : ('Pendiente' as const) }
@@ -2575,7 +2642,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                           updateOrders(updated);
                           showToast('✅ Estado del pedido actualizado');
                         }}
-                        className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider transition ${
+                        className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider transition shrink-0 ${
                           ord.status === 'Pendiente'
                             ? 'bg-amber-100 text-amber-950 hover:bg-amber-200 border border-amber-300'
                             : 'bg-emerald-100 text-emerald-950 hover:bg-emerald-200 border border-emerald-300'
@@ -2584,50 +2651,63 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                         {ord.status}
                       </button>
                     </div>
-                  </div>
 
-                  {/* Date, Time & Delivery Details */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs text-stone-700 bg-amber-50/40 p-3 rounded-xl border border-amber-200/60">
-                    <p>📅 <strong>Fecha:</strong> {ord.order_date}</p>
-                    <p>⏰ <strong>Hora:</strong> {ord.order_time}</p>
-                    <p>🛵 <strong>Tipo de entrega:</strong> {ord.delivery_type === 'domicilio' ? 'Envío a Domicilio' : 'Retirar Personalmente'}</p>
-                    <p className="sm:col-span-3">📍 <strong>Dirección Cliente:</strong> {ord.customer_address}</p>
-                    {ord.additional_note && (
-                      <p className="sm:col-span-3 text-amber-900 font-semibold">📝 <strong>Nota Adicional:</strong> "{ord.additional_note}"</p>
-                    )}
-                  </div>
+                    {/* COLLAPSIBLE ACCORDION CONTENT */}
+                    <AnimatePresence initial={false}>
+                      {isExpanded && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="overflow-hidden space-y-3.5 w-full"
+                        >
+                          {/* Date, Time & Delivery Details */}
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs text-stone-700 bg-amber-50/40 p-3 rounded-xl border border-amber-200/60 mt-1">
+                            <p>📅 <strong>Fecha:</strong> {ord.order_date}</p>
+                            <p>⏰ <strong>Hora:</strong> {ord.order_time}</p>
+                            <p>🛵 <strong>Tipo de entrega:</strong> {ord.delivery_type === 'domicilio' ? 'Envío a Domicilio' : 'Retirar Personalmente'}</p>
+                            <p className="sm:col-span-3">📍 <strong>Dirección Cliente:</strong> {ord.customer_address}</p>
+                            {ord.additional_note && (
+                              <p className="sm:col-span-3 text-amber-900 font-semibold">📝 <strong>Nota Adicional:</strong> "{ord.additional_note}"</p>
+                            )}
+                          </div>
 
-                  {/* Requested Products Table (Requirement 3) */}
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs text-left border-collapse">
-                      <thead>
-                        <tr className="bg-amber-100/50 text-stone-700 font-bold border-b border-amber-200">
-                          <th className="p-2">Producto</th>
-                          <th className="p-2">Cantidad</th>
-                          <th className="p-2">Precio Unitario</th>
-                          <th className="p-2 text-right">Subtotal</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-amber-100">
-                        {ord.items.map((item, idx) => (
-                          <tr key={idx}>
-                            <td className="p-2 font-bold text-stone-900">{item.product_name}</td>
-                            <td className="p-2 font-semibold text-stone-700">{item.quantity}</td>
-                            <td className="p-2">${item.unit_price.toFixed(2)}</td>
-                            <td className="p-2 text-right font-black text-red-700">${item.subtotal.toFixed(2)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                          {/* Requested Products Table (Requirement 3) */}
+                          <div className="overflow-x-auto w-full">
+                            <table className="w-full text-xs text-left border-collapse min-w-[320px]">
+                              <thead>
+                                <tr className="bg-amber-100/50 text-stone-700 font-bold border-b border-amber-200">
+                                  <th className="p-2">Producto</th>
+                                  <th className="p-2">Cantidad</th>
+                                  <th className="p-2">Precio Unitario</th>
+                                  <th className="p-2 text-right">Subtotal</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-amber-100">
+                                {ord.items.map((item, idx) => (
+                                  <tr key={idx}>
+                                    <td className="p-2 font-bold text-stone-900">{item.product_name}</td>
+                                    <td className="p-2 font-semibold text-stone-700">{item.quantity}</td>
+                                    <td className="p-2">${item.unit_price.toFixed(2)}</td>
+                                    <td className="p-2 text-right font-black text-red-700">${item.subtotal.toFixed(2)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
 
-                  <div className="flex justify-end border-t border-amber-100 pt-2">
-                    <p className="text-xs sm:text-sm font-black text-stone-900">
-                      Total General del Pedido: <span className="text-red-700 text-base sm:text-lg">${ord.total.toFixed(2)}</span>
-                    </p>
+                          <div className="flex justify-end border-t border-amber-100 pt-2">
+                            <p className="text-xs sm:text-sm font-black text-stone-900">
+                              Total General del Pedido: <span className="text-red-700 text-base sm:text-lg">${ord.total.toFixed(2)}</span>
+                            </p>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
-                </motion.div>
-              ))}
+                );
+              })}
 
               {currentBizOrders.length === 0 && (
                 <div className="bg-white rounded-2xl p-10 text-center text-stone-400 space-y-2 border border-amber-200/70">
@@ -2642,11 +2722,8 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
 
         {/* TAB 5: REGISTRO DE CLIENTE (Requirement 8) */}
         {activeTab === 'customer_profile' && (
-          <motion.div
-            drag
-            dragElastic={0.12}
-            whileTap={{ cursor: 'grabbing' }}
-            className="max-w-2xl mx-auto bg-white rounded-2xl p-4 sm:p-6 md:p-8 shadow-sm border border-amber-200/70 space-y-5 cursor-grab"
+          <div
+            className="max-w-2xl mx-auto bg-white rounded-2xl p-4 sm:p-6 md:p-8 shadow-sm border border-amber-200/70 space-y-5"
           >
             <div className="border-b border-amber-100 pb-3.5">
               <h2 className="text-xl sm:text-2xl font-black text-stone-900 flex items-center gap-2">
@@ -2738,7 +2815,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                 Guardar Registro de Cliente
               </button>
             </form>
-          </motion.div>
+          </div>
         )}
       </div>
 
@@ -2748,14 +2825,8 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
           const biz = orderingBusiness || selectedBusiness!;
           return (
           <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-stone-900/65 backdrop-blur-xs overflow-y-auto">
-            <motion.div
-              drag
-              dragElastic={0.12}
-              whileTap={{ cursor: 'grabbing' }}
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white w-full max-w-2xl rounded-2xl p-4 sm:p-6 shadow-2xl border border-amber-200 my-6 space-y-4 cursor-grab"
+            <div
+              className="bg-white w-full max-w-2xl rounded-2xl p-4 sm:p-6 shadow-2xl border border-amber-200 my-6 space-y-4"
             >
               <div className="flex items-center justify-between border-b border-amber-100 pb-3">
                 <div>
@@ -2918,7 +2989,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                   </button>
                 </div>
               </div>
-            </motion.div>
+            </div>
           </div>
         );
       })()}
@@ -2928,14 +2999,8 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
       <AnimatePresence>
         {isCustomerModalOpen && (
           <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-stone-900/70 backdrop-blur-xs">
-            <motion.div
-              drag
-              dragElastic={0.12}
-              whileTap={{ cursor: 'grabbing' }}
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white w-full max-w-lg rounded-2xl p-4 sm:p-6 shadow-2xl border border-amber-200 space-y-4 cursor-grab"
+            <div
+              className="bg-white w-full max-w-lg rounded-2xl p-4 sm:p-6 shadow-2xl border border-amber-200 space-y-4"
             >
               <div className="border-b border-amber-100 pb-3">
                 <h3 className="text-base sm:text-lg font-black text-stone-900 flex items-center gap-2">
@@ -3019,7 +3084,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                   Guardar y Confirmar Pedido
                 </button>
               </div>
-            </motion.div>
+            </div>
           </div>
         )}
       </AnimatePresence>
@@ -3028,14 +3093,8 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
       <AnimatePresence>
         {isProductModalOpen && (
           <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-stone-900/60 backdrop-blur-xs">
-            <motion.div
-              drag
-              dragElastic={0.12}
-              whileTap={{ cursor: 'grabbing' }}
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white w-full max-w-md rounded-2xl p-4 sm:p-6 shadow-2xl border border-amber-200 space-y-4 cursor-grab"
+            <div
+              className="bg-white w-full max-w-md rounded-2xl p-4 sm:p-6 shadow-2xl border border-amber-200 space-y-4"
             >
               <div className="flex items-center justify-between border-b border-amber-100 pb-3">
                 <h3 className="text-base sm:text-lg font-black text-stone-900">
@@ -3182,7 +3241,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                   </button>
                 </div>
               </form>
-            </motion.div>
+            </div>
           </div>
         )}
       </AnimatePresence>
@@ -3191,14 +3250,8 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
       <AnimatePresence>
         {orderSuccessOrder && (
           <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-stone-900/70 backdrop-blur-xs">
-            <motion.div
-              drag
-              dragElastic={0.12}
-              whileTap={{ cursor: 'grabbing' }}
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white w-full max-w-md rounded-2xl p-5 sm:p-6 shadow-2xl border border-amber-200 text-center space-y-4 my-6 cursor-grab"
+            <div
+              className="bg-white w-full max-w-md rounded-2xl p-5 sm:p-6 shadow-2xl border border-amber-200 text-center space-y-4 my-6"
             >
               <div className="w-14 h-14 bg-emerald-100 text-emerald-700 rounded-full flex items-center justify-center mx-auto shadow-inner">
                 <CheckCircle className="w-8 h-8" />
@@ -3209,11 +3262,30 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                 Tu solicitud ha sido enviada a <strong>{orderSuccessOrder.business_name}</strong>.
               </p>
 
-              <div className="bg-amber-50/50 p-3.5 rounded-xl border border-amber-200 text-left text-xs space-y-1 font-medium text-stone-800">
-                <p><strong>N° de Pedido:</strong> #{orderSuccessOrder.id.substring(4)}</p>
-                <p><strong>Cliente:</strong> {orderSuccessOrder.customer_name}</p>
-                <p><strong>Entrega:</strong> {orderSuccessOrder.delivery_type === 'domicilio' ? 'Envío a Domicilio' : 'Retiro Personal'}</p>
-                <p><strong>Total:</strong> <span className="text-red-700 font-black">${orderSuccessOrder.total.toFixed(2)}</span></p>
+              <div className="bg-amber-50/50 p-3.5 rounded-xl border border-amber-200 text-left text-[10px] sm:text-xs space-y-2 font-medium text-stone-800">
+                <div className="border-b border-amber-200/60 pb-2 space-y-1">
+                  <p><strong>N° de Pedido:</strong> #{orderSuccessOrder.id.substring(4)}</p>
+                  <p><strong>Cliente:</strong> {orderSuccessOrder.customer_name}</p>
+                  <p><strong>Entrega:</strong> {orderSuccessOrder.delivery_type === 'domicilio' ? 'Envío a Domicilio' : 'Retiro Personal'}</p>
+                </div>
+
+                <div className="space-y-1.5 py-1">
+                  <p className="font-black text-stone-600 uppercase text-[9px] tracking-wider">Detalle de Productos:</p>
+                  {orderSuccessOrder.items.map((item, idx) => (
+                    <div key={idx} className="flex justify-between gap-2 border-b border-amber-100/40 pb-1 last:border-0">
+                      <div className="min-w-0">
+                        <p className="font-bold text-stone-900 truncate">{item.product_name}</p>
+                        <p className="text-[9px] text-stone-500">{item.quantity} x ${item.unit_price.toFixed(2)}</p>
+                      </div>
+                      <span className="font-black text-stone-900 self-center">${item.subtotal.toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="pt-2 border-t border-amber-200 flex justify-between items-center">
+                  <span className="font-black uppercase text-[10px] text-stone-600">Total:</span>
+                  <span className="text-red-700 font-black text-sm sm:text-base">${orderSuccessOrder.total.toFixed(2)}</span>
+                </div>
               </div>
 
               <button
@@ -3222,7 +3294,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
               >
                 Aceptar
               </button>
-            </motion.div>
+            </div>
           </div>
         )}
       </AnimatePresence>
@@ -3231,14 +3303,8 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
       <AnimatePresence>
         {isLoginDropdownOpen && (
           <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-stone-900/70 backdrop-blur-xs">
-            <motion.div
-              drag
-              dragElastic={0.12}
-              whileTap={{ cursor: 'grabbing' }}
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white w-full max-w-sm rounded-2xl p-5 sm:p-6 shadow-2xl border border-amber-200 space-y-4 cursor-grab text-stone-900"
+            <div
+              className="bg-white w-full max-w-sm rounded-2xl p-5 sm:p-6 shadow-2xl border border-amber-200 space-y-4 text-stone-900"
             >
               <div className="flex items-center justify-between border-b border-stone-100 pb-2">
                 <span className="text-sm font-black text-stone-800 flex items-center gap-1.5">
@@ -3293,7 +3359,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                   </button>
                 </div>
               </div>
-            </motion.div>
+            </div>
           </div>
         )}
       </AnimatePresence>
