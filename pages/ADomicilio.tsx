@@ -458,6 +458,30 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [prodName, setProdName] = useState('');
   const [prodPrice, setProdPrice] = useState<number | ''>('');
+
+  const canUserManageBusiness = (b: DomicilioBusiness) => {
+    if (!b) return false;
+    
+    // Normalize phone numbers for precise match
+    const cleanPhone = (p: string) => (p || '').replace(/\D/g, '').trim();
+    const loggedInPhone = (customerProfile?.phone || user?.phone || '').trim();
+    const cleanedLoggedInPhone = cleanPhone(loggedInPhone);
+    const cleanedBusinessPhone = cleanPhone(b.phone || '');
+
+    if (cleanedLoggedInPhone && cleanedBusinessPhone && cleanedLoggedInPhone === cleanedBusinessPhone) {
+      return true;
+    }
+
+    if (user?.id && b.user_id && b.user_id === user.id) return true;
+    if (customerProfile?.id && b.user_id && b.user_id === customerProfile.id) return true;
+
+    const currentName = (user?.full_name || customerProfile?.full_name || bizOwnerName || '').toLowerCase().trim();
+    if (currentName && b.owner_name && b.owner_name.toLowerCase().trim() === currentName) return true;
+    if (b.id && b.id.startsWith('biz_') && b.id !== 'biz_1' && b.id !== 'biz_2' && b.id !== 'biz_3') return true;
+    return false;
+  };
+
+  const myManageableBusinesses = businesses.filter(canUserManageBusiness);
   const [prodImage, setProdImage] = useState('');
   const [prodDisponibleDomicilio, setProdDisponibleDomicilio] = useState(true);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -1299,9 +1323,19 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
     };
   };
 
-  // Filtered Solicitudes de Pedidos (shows all orders requested to businesses)
+  // Filtered Solicitudes de Pedidos (Security: show only orders where the user is the customer or owner)
   const currentBizOrders = orders
     .filter((o) => {
+      // Security Filter: Show only if current user is the customer OR the business owner
+      const cleanPhone = (p: string) => (p || '').replace(/\D/g, '').trim();
+      const loggedInPhone = cleanPhone(customerProfile?.phone || user?.phone || '');
+      const isCustomer = loggedInPhone && cleanPhone(o.customer_phone) === loggedInPhone;
+      
+      const targetBiz = businesses.find((b) => b.id === o.business_id);
+      const isOwner = targetBiz && canUserManageBusiness(targetBiz);
+
+      if (!isCustomer && !isOwner) return false;
+
       if (orderBusinessFilter && o.business_id !== orderBusinessFilter) return false;
       return true;
     })
@@ -1327,29 +1361,6 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
     // Requirement 3: Ordenadas automáticamente desde la más cercana a la más lejana
     .sort((a, b) => (a.distance_km || 0) - (b.distance_km || 0));
 
-  const canUserManageBusiness = (b: DomicilioBusiness) => {
-    if (!b) return false;
-    
-    // Normalize phone numbers for precise match
-    const cleanPhone = (p: string) => (p || '').replace(/\D/g, '').trim();
-    const loggedInPhone = (customerProfile?.phone || user?.phone || '').trim();
-    const cleanedLoggedInPhone = cleanPhone(loggedInPhone);
-    const cleanedBusinessPhone = cleanPhone(b.phone || '');
-
-    if (cleanedLoggedInPhone && cleanedBusinessPhone && cleanedLoggedInPhone === cleanedBusinessPhone) {
-      return true;
-    }
-
-    if (user?.id && b.user_id && b.user_id === user.id) return true;
-    if (customerProfile?.id && b.user_id && b.user_id === customerProfile.id) return true;
-
-    const currentName = (user?.full_name || customerProfile?.full_name || bizOwnerName || '').toLowerCase().trim();
-    if (currentName && b.owner_name && b.owner_name.toLowerCase().trim() === currentName) return true;
-    if (b.id && b.id.startsWith('biz_') && b.id !== 'biz_1' && b.id !== 'biz_2' && b.id !== 'biz_3') return true;
-    return false;
-  };
-
-  const myManageableBusinesses = businesses.filter(canUserManageBusiness);
 
   // Ref for tracking notified order IDs
   const notifiedOrdersRef = useRef<Set<string>>(new Set());
@@ -1620,7 +1631,14 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
               <Truck className="w-3.5 h-3.5 text-red-700" />
               4. Ver Solicitudes{' '}
               <span className="bg-red-600 text-white px-1.5 py-0.5 rounded-full text-[9px] sm:text-[11px] font-black">
-                {orders.filter((o) => o.status === 'Pendiente').length}
+                {orders.filter((o) => {
+                  const cleanPhone = (p: string) => (p || '').replace(/\D/g, '').trim();
+                  const loggedInPhone = cleanPhone(customerProfile?.phone || user?.phone || '');
+                  const isCustomer = loggedInPhone && cleanPhone(o.customer_phone) === loggedInPhone;
+                  const targetBiz = businesses.find((b) => b.id === o.business_id);
+                  const isOwner = targetBiz && canUserManageBusiness(targetBiz);
+                  return (isCustomer || isOwner) && o.status === 'Pendiente';
+                }).length}
               </span>
             </button>
           </div>
