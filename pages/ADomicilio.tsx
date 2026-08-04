@@ -83,6 +83,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [openOnlyFilter, setOpenOnlyFilter] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [selectedImageForView, setSelectedImageForView] = useState<string | null>(null);
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: any) => {
@@ -1445,18 +1446,34 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
 
       {/* Hero Banner Header */}
       <div className="bg-gradient-to-r from-amber-700 via-amber-600 to-red-700 text-white py-4 px-3.5 sm:py-6 sm:px-6 lg:px-8 border-b border-amber-800/40 shadow-md">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <div className="inline-flex items-center gap-1.5 bg-red-800/40 text-amber-200 px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider border border-amber-400/30">
-              <Truck className="w-3 h-3 text-amber-300" />
-              Nuevo Servicio Nacional • El Salvador
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8 flex-grow">
+            <div className="space-y-1">
+              <div className="inline-flex items-center gap-1.5 bg-red-800/40 text-amber-200 px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider border border-amber-400/30">
+                <Truck className="w-3 h-3 text-amber-300" />
+                Nuevo Servicio Nacional • El Salvador
+              </div>
+              <h1 className="text-xl sm:text-3xl md:text-4xl font-black tracking-tight text-white flex items-center gap-2">
+                🛵 A Domicilio <span className="text-amber-200 text-base sm:text-2xl font-normal">NewBank Store</span>
+              </h1>
+              <p className="text-amber-100/90 text-[11px] sm:text-sm max-w-2xl leading-relaxed">
+                Pide directo a los mejores negocios locales, o registra tu propio comercio para recibir pedidos en tiempo real con geolocalización precisa.
+              </p>
             </div>
-            <h1 className="text-xl sm:text-3xl md:text-4xl font-black tracking-tight text-white flex items-center gap-2">
-              🛵 A Domicilio <span className="text-amber-200 text-base sm:text-2xl font-normal">NewBank Store</span>
-            </h1>
-            <p className="text-amber-100/90 text-[11px] sm:text-sm max-w-2xl leading-relaxed">
-              Pide directo a los mejores negocios locales, o registra tu propio comercio para recibir pedidos en tiempo real con geolocalización precisa.
-            </p>
+
+            {deferredPrompt && (
+              <motion.button
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={handleInstallApp}
+                className="inline-flex items-center gap-2.5 px-5 py-2.5 bg-white text-red-700 rounded-2xl text-[10px] sm:text-xs font-black uppercase shadow-xl hover:bg-amber-50 transition border-2 border-white/20 shrink-0"
+              >
+                <Download className="w-4 h-4" />
+                Descargar Aplicación
+              </motion.button>
+            )}
           </div>
 
           {/* Quick Action Badges */}
@@ -1777,10 +1794,16 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                                 <img
                                   src={p.image_url}
                                   alt={p.name}
-                                  className="w-7 h-7 rounded object-cover border border-amber-200"
+                                  onClick={() => setSelectedImageForView(p.image_url)}
+                                  className="w-7 h-7 rounded object-cover border border-amber-200 cursor-zoom-in"
                                 />
                                 <div className="min-w-0">
-                                  <p className="font-extrabold text-stone-900 truncate leading-tight">{p.name}</p>
+                                  <p 
+                                    onClick={() => setSelectedImageForView(p.image_url)}
+                                    className="font-extrabold text-stone-900 truncate leading-tight cursor-pointer hover:text-amber-700 transition-colors"
+                                  >
+                                    {p.name}
+                                  </p>
                                   <p className="text-red-700 font-black text-[9px]">${p.price.toFixed(2)}</p>
                                 </div>
                               </div>
@@ -2328,11 +2351,17 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                             <img
                               src={p.image_url}
                               alt={p.name}
-                              className="w-14 h-14 rounded-xl object-cover border border-amber-200"
+                              onClick={() => setSelectedImageForView(p.image_url)}
+                              className="w-14 h-14 rounded-xl object-cover border border-amber-200 cursor-zoom-in"
                             />
                             <div>
                               <div className="flex items-center gap-2">
-                                <h4 className="font-extrabold text-stone-900 text-xs sm:text-sm">{p.name}</h4>
+                                <h4 
+                                  onClick={() => setSelectedImageForView(p.image_url)}
+                                  className="font-extrabold text-stone-900 text-xs sm:text-sm cursor-pointer hover:text-amber-700 transition-colors"
+                                >
+                                  {p.name}
+                                </h4>
                                 {p.is_hidden && (
                                   <span className="px-2 py-0.5 bg-stone-200 text-stone-700 text-[10px] font-bold rounded">
                                     Oculto
@@ -2949,10 +2978,16 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                             <img
                               src={p.image_url}
                               alt={p.name}
-                              className="w-11 h-11 sm:w-12 sm:h-12 rounded-lg object-cover border border-amber-200"
+                              onClick={() => setSelectedImageForView(p.image_url)}
+                              className="w-11 h-11 sm:w-12 sm:h-12 rounded-lg object-cover border border-amber-200 cursor-zoom-in"
                             />
                             <div>
-                              <p className="font-extrabold text-xs text-stone-900">{p.name}</p>
+                              <p 
+                                onClick={() => setSelectedImageForView(p.image_url)}
+                                className="font-extrabold text-xs text-stone-900 cursor-pointer hover:text-amber-700 transition-colors"
+                              >
+                                {p.name}
+                              </p>
                               <p className="text-red-700 font-black text-xs">${p.price.toFixed(2)}</p>
                             </div>
                           </div>
@@ -3407,6 +3442,40 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* Image Viewer Modal (Requirement: Large image on click) */}
+      <AnimatePresence>
+        {selectedImageForView && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setSelectedImageForView(null)}
+            className="fixed inset-0 z-[20000] bg-stone-950/90 backdrop-blur-sm flex items-center justify-center p-4 sm:p-10 cursor-zoom-out"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative max-w-5xl w-full h-full flex items-center justify-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img
+                src={selectedImageForView}
+                alt="Vista ampliada"
+                className="max-w-full max-h-full rounded-2xl shadow-2xl border border-white/20 object-contain"
+              />
+              <button
+                onClick={() => setSelectedImageForView(null)}
+                className="absolute top-2 right-2 sm:-top-12 sm:-right-12 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full transition-all hover:scale-110 active:scale-95"
+              >
+                <X className="w-6 h-6 sm:w-8 sm:h-8" />
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </div>
   );
 };
