@@ -168,7 +168,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
           const map = L.map(mapContainerRef.current, {
             center: [centerLat, centerLng],
             zoom: mapZoom,
-            zoomControl: true,
+            zoomControl: false,
           });
 
           L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
@@ -176,6 +176,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
             maxZoom: 20,
           }).addTo(map);
 
+          L.control.zoom({ position: 'topright' }).addTo(map);
           markersLayerRef.current = L.layerGroup().addTo(map);
           mapInstanceRef.current = map;
         }
@@ -200,7 +201,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
       const map = L.map(mapContainerRef.current, {
         center: [centerLat, centerLng],
         zoom: mapZoom,
-        zoomControl: true,
+        zoomControl: false,
       });
 
       L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
@@ -208,6 +209,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
         maxZoom: 20,
       }).addTo(map);
 
+      L.control.zoom({ position: 'topright' }).addTo(map);
       markersLayerRef.current = L.layerGroup().addTo(map);
       mapInstanceRef.current = map;
     }
@@ -1283,7 +1285,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                       dragSnapToOrigin
                       dragElastic={0.12}
                       whileTap={{ cursor: 'grabbing' }}
-                      className="absolute top-3 left-3 z-[1000] w-80 max-w-[calc(100%-1.5rem)] bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-amber-200 text-stone-900 overflow-hidden flex flex-col cursor-grab"
+                      className="absolute top-3 left-3 z-[9999] w-80 max-w-[calc(100%-1.5rem)] bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-amber-200 text-stone-900 overflow-hidden flex flex-col cursor-grab"
                     >
                       <div className="p-3.5 border-b border-amber-100 bg-amber-50/70 flex items-start justify-between gap-2">
                         <div>
@@ -1337,7 +1339,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                       </div>
 
                       {/* List of Products inside floating card */}
-                      <div className="px-3.5 py-2 max-h-60 overflow-y-auto space-y-2 border-t border-amber-100">
+                      <div className="px-3.5 py-2 max-h-40 overflow-y-auto space-y-2 border-t border-amber-100">
                         <div className="flex items-center justify-between text-[11px] font-bold text-stone-500 uppercase tracking-wider mb-1">
                           <span>Productos Disponibles ({bizProducts.length})</span>
                           <span>Envío</span>
