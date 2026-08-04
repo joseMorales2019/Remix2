@@ -73,6 +73,9 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
   const [products, setProducts] = useState<DomicilioProduct[]>([]);
   const [orders, setOrders] = useState<DomicilioOrder[]>([]);
   const [customerProfile, setCustomerProfile] = useState<DomicilioCustomerProfile | null>(null);
+  const [allCustomerProfiles, setAllCustomerProfiles] = useState<DomicilioCustomerProfile[]>([]);
+  const [isLoginDropdownOpen, setIsLoginDropdownOpen] = useState(false);
+  const [loginSearchText, setLoginSearchText] = useState('');
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -478,6 +481,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
     setProducts(loadedProd);
     setOrders(loadedOrd);
     setCustomerProfile(loadedCust);
+    setAllCustomerProfiles(loadedCust ? [loadedCust] : []);
 
     if (loadedBiz.length > 0) {
       setSelectedBusiness(loadedBiz[0]);
@@ -492,27 +496,262 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
       setCustName(loadedCust.full_name);
       setCustPhone(loadedCust.phone);
     }
-  }, []);
 
-  // Save changes to localStorage whenever state changes
-  const updateBusinesses = (newList: DomicilioBusiness[]) => {
+    // Load from Supabase Real Database to allow public visualization
+    const syncWithSupabaseOnMount = async () => {
+      try {
+        const { data: dbBiz, error: bizErr } = await supabase
+          .from('domicilio_businesses')
+          .select('*');
+
+        if (!bizErr && dbBiz && dbBiz.length > 0) {
+          const mergedBiz = [...loadedBiz];
+          dbBiz.forEach((b: DomicilioBusiness) => {
+            const idx = mergedBiz.findIndex((item) => item.id === b.id);
+            if (idx >= 0) {
+              mergedBiz[idx] = b;
+            } else {
+              mergedBiz.push(b);
+            }
+          });
+          setBusinesses(mergedBiz);
+          if (mergedBiz.length > 0) {
+            setSelectedBusiness(mergedBiz[0]);
+            setManagingBusinessId(mergedBiz[0].id);
+          }
+        }
+
+        const { data: dbProd, error: prodErr } = await supabase
+          .from('domicilio_products')
+          .select('*');
+
+        if (!prodErr && dbProd && dbProd.length > 0) {
+          const mergedProd = [...loadedProd];
+          dbProd.forEach((p: DomicilioProduct) => {
+            const idx = mergedProd.findIndex((item) => item.id === p.id);
+            if (idx >= 0) {
+              mergedProd[idx] = p;
+            } else {
+              mergedProd.push(p);
+            }
+          });
+          setProducts(mergedProd);
+        }
+
+        const { data: dbOrd, error: ordErr } = await supabase
+          .from('domicilio_orders')
+          .select('*');
+
+        if (!ordErr && dbOrd && dbOrd.length > 0) {
+          const mergedOrd = [...loadedOrd];
+          dbOrd.forEach((o: DomicilioOrder) => {
+            const idx = mergedOrd.findIndex((item) => item.id === o.id);
+            if (idx >= 0) {
+              mergedOrd[idx] = o;
+            } else {
+              mergedOrd.push(o);
+            }
+          });
+          setOrders(mergedOrd);
+        }
+
+        const { data: dbCust, error: custErr } = await supabase
+          .from('domicilio_customer_profiles')
+          .select('*');
+
+        if (!custErr && dbCust && dbCust.length > 0) {
+          setAllCustomerProfiles(dbCust);
+          const myDbProfile = dbCust.find((c: any) => c.user_id === user?.id);
+          if (myDbProfile) {
+            setCustomerProfile(myDbProfile);
+            setOrderAddressInput(myDbProfile.address);
+            setCustLat(myDbProfile.latitude);
+            setCustLng(myDbProfile.longitude);
+            setCustAddress(myDbProfile.address);
+            setCustName(myDbProfile.full_name);
+            setCustPhone(myDbProfile.phone);
+          }
+        }
+      } catch (err) {
+        console.error("Graceful fallback: Supabase load error:", err);
+      }
+    };
+    syncWithSupabaseOnMount();
+  }, [user]);
+
+  // Robust client-side UUID generator for database compliance
+  const generateUUID = () => {
+    let d = new Date().getTime();
+    let d2 = ((typeof performance !== 'undefined') && performance.now && (performance.now() * 1000)) || 0;
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      let r = Math.random() * 16;
+      if (d > 0) {
+        r = (d + r) % 16 | 0;
+        d = Math.floor(d / 16);
+      } else {
+        r = (d2 + r) % 16 | 0;
+        d2 = Math.floor(d2 / 16);
+      }
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    });
+  };
+
+  // Save changes to localStorage and synchronize with Supabase database
+  const updateBusinesses = async (newList: DomicilioBusiness[]) => {
     setBusinesses(newList);
     saveBusinesses(newList);
+
+    for (const b of newList) {
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(b.id);
+      if (isUUID || b.user_id) {
+        try {
+          const payload: any = {
+            owner_name: b.owner_name,
+            phone: b.phone,
+            business_name: b.business_name,
+            is_24_7: b.is_24_7,
+            schedules: b.schedules,
+            latitude: b.latitude,
+            longitude: b.longitude,
+            address_text: b.address_text,
+            delivery_paused: b.delivery_paused || false,
+            manual_closed: b.manual_closed || false,
+            user_id: b.user_id || null
+          };
+          if (isUUID) {
+            payload.id = b.id;
+          }
+          await supabase.from('domicilio_businesses').upsert(payload);
+        } catch (err) {
+          console.error("Error upserting business to Supabase:", err);
+        }
+      }
+    }
   };
 
-  const updateProducts = (newList: DomicilioProduct[]) => {
+  const updateProducts = async (newList: DomicilioProduct[]) => {
     setProducts(newList);
     saveProducts(newList);
+
+    for (const p of newList) {
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p.id);
+      const isBizUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p.business_id);
+      
+      if (isBizUUID) {
+        try {
+          const payload: any = {
+            business_id: p.business_id,
+            name: p.name,
+            price: p.price,
+            image_url: p.image_url,
+            disponible_domicilio: p.disponible_domicilio,
+            is_hidden: p.is_hidden || false,
+          };
+          if (isUUID) {
+            payload.id = p.id;
+          }
+          await supabase.from('domicilio_products').upsert(payload);
+        } catch (err) {
+          console.error("Error upserting product to Supabase:", err);
+        }
+      }
+    }
   };
 
-  const updateOrders = (newList: DomicilioOrder[]) => {
+  const updateOrders = async (newList: DomicilioOrder[]) => {
     setOrders(newList);
     saveOrders(newList);
+
+    for (const o of newList) {
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(o.id);
+      const isBizUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(o.business_id);
+      
+      if (isBizUUID) {
+        try {
+          const payload: any = {
+            business_id: o.business_id,
+            business_name: o.business_name,
+            customer_name: o.customer_name,
+            customer_phone: o.customer_phone,
+            customer_address: o.customer_address,
+            customer_latitude: o.customer_latitude,
+            customer_longitude: o.customer_longitude,
+            order_date: o.order_date,
+            order_time: o.order_time,
+            delivery_type: o.delivery_type,
+            items: o.items,
+            total: o.total,
+            additional_note: o.additional_note || null,
+            status: o.status || 'Pendiente'
+          };
+          if (isUUID) {
+            payload.id = o.id;
+          }
+          await supabase.from('domicilio_orders').upsert(payload);
+        } catch (err) {
+          console.error("Error upserting order to Supabase:", err);
+        }
+      }
+    }
   };
 
-  const updateCustomerProfileData = (profile: DomicilioCustomerProfile) => {
+  const updateCustomerProfileData = async (profile: DomicilioCustomerProfile) => {
     setCustomerProfile(profile);
     saveCustomerProfile(profile);
+
+    setAllCustomerProfiles((prev) => {
+      const idx = prev.findIndex((p) => p.id === profile.id);
+      if (idx >= 0) {
+        const copy = [...prev];
+        copy[idx] = profile;
+        return copy;
+      } else {
+        return [profile, ...prev];
+      }
+    });
+
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(profile.id);
+    try {
+      const payload: any = {
+        user_id: user?.id || null,
+        full_name: profile.full_name,
+        phone: profile.phone,
+        address: profile.address,
+        latitude: profile.latitude,
+        longitude: profile.longitude
+      };
+      if (isUUID) {
+        payload.id = profile.id;
+      }
+      await supabase.from('domicilio_customer_profiles').upsert(payload);
+    } catch (err) {
+      console.error("Error upserting customer profile to Supabase:", err);
+    }
+  };
+
+  const loginAsProfile = (prof: DomicilioCustomerProfile) => {
+    setCustomerProfile(prof);
+    saveCustomerProfile(prof);
+    setOrderAddressInput(prof.address);
+    setCustLat(prof.latitude);
+    setCustLng(prof.longitude);
+    setCustAddress(prof.address);
+    setCustName(prof.full_name);
+    setCustPhone(prof.phone);
+    setIsLoginDropdownOpen(false);
+    showToast(`🔑 Sesión iniciada como ${prof.full_name}`);
+  };
+
+  const logoutProfile = () => {
+    setCustomerProfile(null);
+    saveCustomerProfile(null);
+    setOrderAddressInput('');
+    setCustLat(undefined);
+    setCustLng(undefined);
+    setCustAddress('');
+    setCustName('');
+    setCustPhone('');
+    showToast(`🔒 Sesión cerrada`);
   };
 
   // GPS Captures
@@ -592,7 +831,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
     }
 
     const newBiz: DomicilioBusiness = {
-      id: 'biz_' + Date.now(),
+      id: generateUUID(),
       owner_name: bizOwnerName.trim(),
       phone: bizPhone.trim(),
       business_name: bizName.trim(),
@@ -660,7 +899,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
     } else {
       // New
       const newProd: DomicilioProduct = {
-        id: 'prod_' + Date.now(),
+        id: generateUUID(),
         business_id: managingBusinessId,
         name: prodName.trim(),
         price: Number(prodPrice),
@@ -714,6 +953,43 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
     }
   };
 
+  const handleDeleteBusiness = async (businessId: string) => {
+    const biz = businesses.find((b) => b.id === businessId);
+    if (!biz) return;
+    if (!canUserManageBusiness(biz)) {
+      showToast('⚠️ Acceso denegado: Solo el creador de este negocio puede eliminarlo');
+      return;
+    }
+    if (window.confirm(`¿Estás seguro de que deseas eliminar el negocio "${biz.business_name}"? Esta acción eliminará permanentemente el negocio y todos sus productos.`)) {
+      try {
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(businessId);
+        if (isUUID) {
+          await supabase.from('domicilio_products').delete().eq('business_id', businessId);
+          await supabase.from('domicilio_businesses').delete().eq('id', businessId);
+        }
+      } catch (err) {
+        console.error("Error deleting from Supabase:", err);
+      }
+
+      const updatedBiz = businesses.filter((b) => b.id !== businessId);
+      setBusinesses(updatedBiz);
+      saveBusinesses(updatedBiz);
+
+      const updatedProds = products.filter((p) => p.business_id !== businessId);
+      setProducts(updatedProds);
+      saveProducts(updatedProds);
+
+      showToast('🗑️ Negocio y sus productos eliminados con éxito');
+
+      const myManageable = updatedBiz.filter(b => canUserManageBusiness(b));
+      if (myManageable.length > 0) {
+        setManagingBusinessId(myManageable[0].id);
+      } else {
+        setManagingBusinessId('');
+      }
+    }
+  };
+
   // Submit Customer Profile (Requirement 8)
   const handleSaveCustomerProfileSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -729,7 +1005,9 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
     }
 
     const newProfile: DomicilioCustomerProfile = {
-      id: 'cust_' + (user?.id || Date.now()),
+      id: user?.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id)
+        ? user.id
+        : generateUUID(),
       full_name: custName.trim(),
       phone: custPhone.trim(),
       address: custAddress.trim(),
@@ -809,7 +1087,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
     const timeStr = now.toTimeString().split(' ')[0].substring(0, 5);
 
     const newOrder: DomicilioOrder = {
-      id: 'ord_' + Date.now(),
+      id: generateUUID(),
       business_id: biz.id,
       business_name: biz.business_name,
       customer_name: customerProfile.full_name,
@@ -1175,12 +1453,89 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
               <span>Notificaciones Push</span>
             </button>
 
-            <div className="flex items-center gap-2 bg-amber-50/80 border border-amber-200 px-3 py-1.5 rounded-full text-xs font-bold text-amber-950">
+            <div className="relative flex items-center gap-2 bg-amber-50/80 border border-amber-200 px-3 py-1.5 rounded-full text-xs font-bold text-amber-950">
               <MapPin className="w-3.5 h-3.5 text-red-600" />
               {customerProfile ? (
-                <span>Cliente: <strong className="text-stone-900">{customerProfile.full_name}</strong></span>
+                <span className="flex items-center gap-1">
+                  Cliente: <strong className="text-stone-900 truncate max-w-[120px]" title={customerProfile.full_name}>{customerProfile.full_name}</strong>
+                  <button
+                    onClick={logoutProfile}
+                    className="ml-1.5 px-2 py-0.5 bg-red-100 hover:bg-red-200 text-red-700 text-[10px] font-extrabold rounded-md border border-red-200 cursor-pointer transition"
+                    title="Cerrar sesión de cliente"
+                  >
+                    Cerrar Sesión
+                  </button>
+                </span>
               ) : (
-                <span className="text-red-700 font-extrabold">Sin GPS Cliente</span>
+                <span className="flex items-center gap-1">
+                  <span className="text-red-700 font-extrabold">Sin GPS Cliente</span>
+                  <button
+                    onClick={() => setIsLoginDropdownOpen(!isLoginDropdownOpen)}
+                    className="ml-1.5 px-2 py-0.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-[10px] font-extrabold rounded-md border border-emerald-200 cursor-pointer transition"
+                  >
+                    Iniciar Sesión
+                  </button>
+                </span>
+              )}
+
+              {/* Popover / Dropdown to Iniciar Sesión como... */}
+              {isLoginDropdownOpen && (
+                <div className="absolute top-full mt-2 right-0 w-64 bg-white border border-amber-200 rounded-xl shadow-xl z-[9999] p-3 space-y-2 text-stone-900">
+                  <div className="flex items-center justify-between border-b border-stone-100 pb-2">
+                    <span className="text-xs font-black text-stone-800">Iniciar Sesión Como:</span>
+                    <button
+                      onClick={() => setIsLoginDropdownOpen(false)}
+                      className="text-stone-400 hover:text-stone-600 p-0.5 rounded-md hover:bg-stone-100"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                  
+                  {/* Search input to filter profiles */}
+                  <input
+                    type="text"
+                    placeholder="Buscar cliente..."
+                    value={loginSearchText}
+                    onChange={(e) => setLoginSearchText(e.target.value)}
+                    className="w-full px-2 py-1 border border-amber-200/60 rounded-md text-[11px] focus:outline-none focus:ring-1 focus:ring-amber-500 bg-amber-50/10 text-stone-800 font-medium"
+                  />
+
+                  <div className="max-h-40 overflow-y-auto space-y-1 pr-1 font-medium">
+                    {allCustomerProfiles.filter((p) =>
+                      p.full_name.toLowerCase().includes(loginSearchText.toLowerCase()) ||
+                      p.phone.includes(loginSearchText)
+                    ).length > 0 ? (
+                      allCustomerProfiles
+                        .filter((p) =>
+                          p.full_name.toLowerCase().includes(loginSearchText.toLowerCase()) ||
+                          p.phone.includes(loginSearchText)
+                        )
+                        .map((prof) => (
+                          <button
+                            key={prof.id}
+                            onClick={() => loginAsProfile(prof)}
+                            className="w-full text-left px-2.5 py-1.5 hover:bg-amber-50 rounded-lg text-xs flex flex-col transition border border-transparent hover:border-amber-100 cursor-pointer"
+                          >
+                            <span className="font-extrabold text-stone-900 truncate">{prof.full_name}</span>
+                            <span className="text-[10px] text-stone-500">{prof.phone} • {prof.address.substring(0, 30)}...</span>
+                          </button>
+                        ))
+                    ) : (
+                      <div className="text-[11px] text-stone-500 py-3 text-center">
+                        Ningún cliente encontrado.
+                        <button
+                          onClick={() => {
+                            setIsLoginDropdownOpen(false);
+                            setIsCustomerModalOpen(true);
+                          }}
+                          className="block mx-auto mt-1 text-[11px] text-amber-600 hover:underline font-bold"
+                        >
+                          Registrar Nuevo Cliente
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -1746,7 +2101,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                   </div>
 
                   {managingBiz && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         onClick={() => {
                           setEditingProductId(null);
@@ -1778,6 +2133,14 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                         className="px-3.5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs uppercase tracking-wider rounded-xl transition flex items-center gap-1.5 shadow-xs"
                       >
                         <Truck className="w-4 h-4 text-amber-200" /> Ver Solicitudes
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteBusiness(managingBiz.id)}
+                        className="px-3.5 py-2.5 bg-red-100 hover:bg-red-200 text-red-700 border border-red-300 hover:border-red-400 font-extrabold text-xs uppercase tracking-wider rounded-xl transition flex items-center gap-1.5 shadow-xs cursor-pointer"
+                        title="Eliminar este negocio permanentemente"
+                      >
+                        <Trash2 className="w-4 h-4 text-red-600" /> Eliminar Negocio
                       </button>
                     </div>
                   )}
