@@ -1404,40 +1404,80 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
           </div>
 
           {/* Quick Action Badges */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <button
-              onClick={() => handleTabSelect('explore')}
-              className={`px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl font-extrabold text-[10px] sm:text-xs uppercase tracking-wider transition flex items-center gap-1.5 ${
-                activeTab === 'explore'
-                  ? 'bg-red-600 text-white shadow-md shadow-red-900/30 border border-red-500'
-                  : 'bg-amber-800/40 text-amber-100 hover:bg-amber-800/60 border border-amber-400/20'
-              }`}
-            >
-              <Store className="w-3.5 h-3.5" />
-              Ver Mapa & Negocios
-            </button>
-            <button
-              onClick={() => handleTabSelect('register_business')}
-              className={`px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl font-extrabold text-[10px] sm:text-xs uppercase tracking-wider transition flex items-center gap-1.5 ${
-                activeTab === 'register_business'
-                  ? 'bg-red-600 text-white shadow-md shadow-red-900/30 border border-red-500'
-                  : 'bg-amber-800/40 text-amber-100 hover:bg-amber-800/60 border border-amber-400/20'
-              }`}
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Registrar Negocio
-            </button>
-            <button
-              onClick={() => handleTabSelect('customer_profile')}
-              className={`px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl font-extrabold text-[10px] sm:text-xs uppercase tracking-wider transition flex items-center gap-1.5 ${
-                activeTab === 'customer_profile'
-                  ? 'bg-red-600 text-white shadow-md shadow-red-900/30 border border-red-500'
-                  : 'bg-amber-800/40 text-amber-100 hover:bg-amber-800/60 border border-amber-400/20'
-              }`}
-            >
-              <User className="w-3.5 h-3.5" />
-              Mi Registro Cliente
-            </button>
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                onClick={() => handleTabSelect('explore')}
+                className={`px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl font-extrabold text-[10px] sm:text-xs uppercase tracking-wider transition flex items-center gap-1.5 ${
+                  activeTab === 'explore'
+                    ? 'bg-red-600 text-white shadow-md shadow-red-900/30 border border-red-500'
+                    : 'bg-amber-800/40 text-amber-100 hover:bg-amber-800/60 border border-amber-400/20'
+                }`}
+              >
+                <Store className="w-3.5 h-3.5" />
+                Ver Mapa & Negocios
+              </button>
+              <button
+                onClick={() => handleTabSelect('register_business')}
+                className={`px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl font-extrabold text-[10px] sm:text-xs uppercase tracking-wider transition flex items-center gap-1.5 ${
+                  activeTab === 'register_business'
+                    ? 'bg-red-600 text-white shadow-md shadow-red-900/30 border border-red-500'
+                    : 'bg-amber-800/40 text-amber-100 hover:bg-amber-800/60 border border-amber-400/20'
+                }`}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                Registrar Negocio
+              </button>
+              <button
+                onClick={() => handleTabSelect('customer_profile')}
+                className={`px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl font-extrabold text-[10px] sm:text-xs uppercase tracking-wider transition flex items-center gap-1.5 ${
+                  activeTab === 'customer_profile'
+                    ? 'bg-red-600 text-white shadow-md shadow-red-900/30 border border-red-500'
+                    : 'bg-amber-800/40 text-amber-100 hover:bg-amber-800/60 border border-amber-400/20'
+                }`}
+              >
+                <User className="w-3.5 h-3.5" />
+                Mi Registro Cliente
+              </button>
+            </div>
+
+            {/* Opciones de perfil y notificación movidas para alta visibilidad en pantallas móviles */}
+            <div className="flex flex-wrap items-center gap-2 mt-1">
+              <button
+                onClick={requestNotificationAccess}
+                className="flex items-center gap-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-100 border border-amber-400/30 px-2 py-1 rounded-lg text-[9px] sm:text-xs font-black transition cursor-pointer"
+                title="Activar notificaciones push para solicitudes de pedidos"
+              >
+                <Bell className="w-3 h-3 text-amber-300 animate-pulse" />
+                <span>Notificaciones Push</span>
+              </button>
+
+              <div className="relative flex items-center gap-1.5 bg-red-950/40 border border-red-500/20 px-2 py-1 rounded-lg text-[9px] sm:text-xs font-bold text-amber-100">
+                <MapPin className="w-3 h-3 text-red-400" />
+                {customerProfile ? (
+                  <span className="flex items-center gap-1">
+                    Cliente: <strong className="text-white truncate max-w-[90px] sm:max-w-[120px]" title={customerProfile.full_name}>{customerProfile.full_name}</strong>
+                    <button
+                      onClick={logoutProfile}
+                      className="ml-1 px-1.5 py-0.5 bg-red-900/40 hover:bg-red-800/60 text-red-200 text-[8px] sm:text-[9px] font-extrabold rounded border border-red-800/30 cursor-pointer transition"
+                      title="Cerrar sesión de cliente"
+                    >
+                      Cerrar Sesión
+                    </button>
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1">
+                    <span className="text-amber-200/80 font-extrabold">Sin GPS Cliente</span>
+                    <button
+                      onClick={() => setIsLoginDropdownOpen(true)}
+                      className="ml-1 px-1.5 py-0.5 bg-emerald-950/40 hover:bg-emerald-800/60 text-emerald-200 text-[8px] sm:text-[9px] font-extrabold rounded border border-emerald-800/30 cursor-pointer transition"
+                    >
+                      Iniciar Sesión
+                    </button>
+                  </span>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1493,44 +1533,6 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                 {orders.filter((o) => o.status === 'Pendiente').length}
               </span>
             </button>
-          </div>
-
-          {/* Customer Location Status & Push Notification Button */}
-          <div className="hidden lg:flex items-center gap-2">
-            <button
-              onClick={requestNotificationAccess}
-              className="flex items-center gap-1.5 bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 px-3 py-1.5 rounded-full text-xs font-black transition shadow-xs cursor-pointer"
-              title="Activar notificaciones push para solicitudes de pedidos"
-            >
-              <Bell className="w-3.5 h-3.5 text-amber-700 animate-bounce" />
-              <span>Notificaciones Push</span>
-            </button>
-
-            <div className="relative flex items-center gap-2 bg-amber-50/80 border border-amber-200 px-3 py-1.5 rounded-full text-xs font-bold text-amber-950">
-              <MapPin className="w-3.5 h-3.5 text-red-600" />
-              {customerProfile ? (
-                <span className="flex items-center gap-1">
-                  Cliente: <strong className="text-stone-900 truncate max-w-[120px]" title={customerProfile.full_name}>{customerProfile.full_name}</strong>
-                  <button
-                    onClick={logoutProfile}
-                    className="ml-1.5 px-2 py-0.5 bg-red-100 hover:bg-red-200 text-red-700 text-[10px] font-extrabold rounded-md border border-red-200 cursor-pointer transition"
-                    title="Cerrar sesión de cliente"
-                  >
-                    Cerrar Sesión
-                  </button>
-                </span>
-              ) : (
-                <span className="flex items-center gap-1">
-                  <span className="text-red-700 font-extrabold">Sin GPS Cliente</span>
-                  <button
-                    onClick={() => setIsLoginDropdownOpen(true)}
-                    className="ml-1.5 px-2 py-0.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-[10px] font-extrabold rounded-md border border-emerald-200 cursor-pointer transition"
-                  >
-                    Iniciar Sesión
-                  </button>
-                </span>
-              )}
-            </div>
           </div>
         </div>
       </div>
