@@ -1,0 +1,13 @@
+{
+  "name": "2Remix NewBank Store",
+  "description": "NewBank Store: Tienda en línea líder en El Salvador de artículos militares, juegos competitivos, inteligencia artificial y desarrollo de proyectos.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone",
+    "geolocation",
+    "display-capture"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

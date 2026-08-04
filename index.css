@@ -1,0 +1,25 @@
+/* Elegant scrollbar */
+.elegant-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+
+.elegant-scrollbar::-webkit-scrollbar-track {
+  background: rgba(241, 245, 249, 0.5); /* slate-50 */
+  border-radius: 10px;
+}
+
+.elegant-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1; /* slate-300 */
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.elegant-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8; /* slate-400 */
+}
+
+/* For Firefox */
+.elegant-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
