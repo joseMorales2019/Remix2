@@ -164,13 +164,16 @@
         body { font-family: 'Inter', sans-serif; }
     </style>
     <script>
-      // Clear any existing service workers to prevent stale/broken cache issues
+      // Service Worker Registration for PWA
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(registrations => {
-          for(let registration of registrations) {
-            registration.unregister();
-            console.log('SW unregistered');
-          }
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(registration => {
+              console.log('SW registered with scope:', registration.scope);
+            })
+            .catch(error => {
+              console.error('SW registration failed:', error);
+            });
         });
       }
     </script>

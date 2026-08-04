@@ -82,6 +82,25 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
   const [openOnlyFilter, setOpenOnlyFilter] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+  }, []);
+
+  const handleInstallApp = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+    }
+  };
 
   // Filtered Businesses for Map/Explore View (also checks if any product matches searchQuery)
   const filteredBusinesses = businesses.filter((b) => {
@@ -1580,6 +1599,31 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
         {/* TAB 1: VISUALIZACIÓN EN EL MAPA Y TARJETAS DE NEGOCIOS (Requirements 5 & 6) */}
         {activeTab === 'explore' && (
           <div className="space-y-5 flex-grow flex flex-col">
+            {/* PWA Install Banner */}
+            {deferredPrompt && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-gradient-to-r from-blue-600 to-indigo-700 p-4 rounded-2xl shadow-lg border border-blue-400/30 flex flex-col sm:flex-row items-center justify-between gap-4 text-white"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white/20 backdrop-blur-md rounded-xl flex items-center justify-center text-xl shrink-0">
+                    📲
+                  </div>
+                  <div>
+                    <h4 className="font-black text-sm uppercase tracking-tight">Instalar Aplicación</h4>
+                    <p className="text-[10px] opacity-90 font-medium">Accede más rápido y recibe notificaciones de tus pedidos.</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={handleInstallApp}
+                  className="w-full sm:w-auto px-6 py-2 bg-white text-blue-700 font-black text-xs uppercase tracking-widest rounded-xl shadow-md hover:bg-blue-50 transition"
+                >
+                  Descargar Ahora
+                </button>
+              </motion.div>
+            )}
+
             {/* Search & Filter Header */}
             <div
               className="bg-white rounded-2xl p-3.5 sm:p-5 shadow-sm border border-amber-200/70 flex flex-col md:flex-row md:items-center justify-between gap-3"
