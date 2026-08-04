@@ -75,7 +75,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
   const [customerProfile, setCustomerProfile] = useState<DomicilioCustomerProfile | null>(null);
   const [allCustomerProfiles, setAllCustomerProfiles] = useState<DomicilioCustomerProfile[]>([]);
   const [isLoginDropdownOpen, setIsLoginDropdownOpen] = useState(false);
-  const [loginSearchText, setLoginSearchText] = useState('');
+  const [loginPhoneInput, setLoginPhoneInput] = useState('');
 
   // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
@@ -472,9 +472,16 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
 
   // Load Data on Mount
   useEffect(() => {
-    const loadedBiz = getStoredBusinesses();
-    const loadedProd = getStoredProducts();
-    const loadedOrd = getStoredOrders();
+    // Filter out starter templates entirely to comply with user request to only show DB-saved data
+    const loadedBiz = getStoredBusinesses().filter(
+      (b) => b.id !== 'biz_1' && b.id !== 'biz_2' && b.id !== 'biz_3'
+    );
+    const loadedProd = getStoredProducts().filter(
+      (p) => !['p_1', 'p_2', 'p_3', 'p_4', 'p_5', 'p_6', 'p_7', 'p_8', 'p_9', 'p_10'].includes(p.id)
+    );
+    const loadedOrd = getStoredOrders().filter(
+      (o) => o.id !== 'ord_1' && o.id !== 'ord_2'
+    );
     const loadedCust = getStoredCustomerProfile();
 
     setBusinesses(loadedBiz);
@@ -505,8 +512,12 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
           .select('*');
 
         if (!bizErr && dbBiz && dbBiz.length > 0) {
+          // Filter out template IDs
+          const nonTemplateDbBiz = dbBiz.filter(
+            (b: any) => b.id !== 'biz_1' && b.id !== 'biz_2' && b.id !== 'biz_3'
+          );
           const mergedBiz = [...loadedBiz];
-          dbBiz.forEach((b: DomicilioBusiness) => {
+          nonTemplateDbBiz.forEach((b: DomicilioBusiness) => {
             const idx = mergedBiz.findIndex((item) => item.id === b.id);
             if (idx >= 0) {
               mergedBiz[idx] = b;
@@ -526,8 +537,12 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
           .select('*');
 
         if (!prodErr && dbProd && dbProd.length > 0) {
+          // Filter out template IDs
+          const nonTemplateDbProd = dbProd.filter(
+            (p: any) => !['p_1', 'p_2', 'p_3', 'p_4', 'p_5', 'p_6', 'p_7', 'p_8', 'p_9', 'p_10'].includes(p.id)
+          );
           const mergedProd = [...loadedProd];
-          dbProd.forEach((p: DomicilioProduct) => {
+          nonTemplateDbProd.forEach((p: DomicilioProduct) => {
             const idx = mergedProd.findIndex((item) => item.id === p.id);
             if (idx >= 0) {
               mergedProd[idx] = p;
@@ -543,8 +558,12 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
           .select('*');
 
         if (!ordErr && dbOrd && dbOrd.length > 0) {
+          // Filter out template IDs
+          const nonTemplateDbOrd = dbOrd.filter(
+            (o: any) => o.id !== 'ord_1' && o.id !== 'ord_2'
+          );
           const mergedOrd = [...loadedOrd];
-          dbOrd.forEach((o: DomicilioOrder) => {
+          nonTemplateDbOrd.forEach((o: DomicilioOrder) => {
             const idx = mergedOrd.findIndex((item) => item.id === o.id);
             if (idx >= 0) {
               mergedOrd[idx] = o;
@@ -752,6 +771,27 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
     setCustName('');
     setCustPhone('');
     showToast(`🔒 Sesión cerrada`);
+  };
+
+  const handleLoginSubmit = () => {
+    const cleanedInput = loginPhoneInput.replace(/\D/g, '').trim();
+    if (!cleanedInput) {
+      showToast('⚠️ Por favor ingresa tu número de teléfono');
+      return;
+    }
+
+    const match = allCustomerProfiles.find((p) => {
+      const cleanedProfilePhone = p.phone.replace(/\D/g, '').trim();
+      return cleanedProfilePhone === cleanedInput || p.phone.trim() === loginPhoneInput.trim();
+    });
+
+    if (match) {
+      loginAsProfile(match);
+      setLoginPhoneInput('');
+      setIsLoginDropdownOpen(false);
+    } else {
+      showToast('❌ No se encontró ningún cliente con ese número de teléfono');
+    }
   };
 
   // GPS Captures
@@ -1470,72 +1510,12 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                 <span className="flex items-center gap-1">
                   <span className="text-red-700 font-extrabold">Sin GPS Cliente</span>
                   <button
-                    onClick={() => setIsLoginDropdownOpen(!isLoginDropdownOpen)}
+                    onClick={() => setIsLoginDropdownOpen(true)}
                     className="ml-1.5 px-2 py-0.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-[10px] font-extrabold rounded-md border border-emerald-200 cursor-pointer transition"
                   >
                     Iniciar Sesión
                   </button>
                 </span>
-              )}
-
-              {/* Popover / Dropdown to Iniciar Sesión como... */}
-              {isLoginDropdownOpen && (
-                <div className="absolute top-full mt-2 right-0 w-64 bg-white border border-amber-200 rounded-xl shadow-xl z-[9999] p-3 space-y-2 text-stone-900">
-                  <div className="flex items-center justify-between border-b border-stone-100 pb-2">
-                    <span className="text-xs font-black text-stone-800">Iniciar Sesión Como:</span>
-                    <button
-                      onClick={() => setIsLoginDropdownOpen(false)}
-                      className="text-stone-400 hover:text-stone-600 p-0.5 rounded-md hover:bg-stone-100"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                  
-                  {/* Search input to filter profiles */}
-                  <input
-                    type="text"
-                    placeholder="Buscar cliente..."
-                    value={loginSearchText}
-                    onChange={(e) => setLoginSearchText(e.target.value)}
-                    className="w-full px-2 py-1 border border-amber-200/60 rounded-md text-[11px] focus:outline-none focus:ring-1 focus:ring-amber-500 bg-amber-50/10 text-stone-800 font-medium"
-                  />
-
-                  <div className="max-h-40 overflow-y-auto space-y-1 pr-1 font-medium">
-                    {allCustomerProfiles.filter((p) =>
-                      p.full_name.toLowerCase().includes(loginSearchText.toLowerCase()) ||
-                      p.phone.includes(loginSearchText)
-                    ).length > 0 ? (
-                      allCustomerProfiles
-                        .filter((p) =>
-                          p.full_name.toLowerCase().includes(loginSearchText.toLowerCase()) ||
-                          p.phone.includes(loginSearchText)
-                        )
-                        .map((prof) => (
-                          <button
-                            key={prof.id}
-                            onClick={() => loginAsProfile(prof)}
-                            className="w-full text-left px-2.5 py-1.5 hover:bg-amber-50 rounded-lg text-xs flex flex-col transition border border-transparent hover:border-amber-100 cursor-pointer"
-                          >
-                            <span className="font-extrabold text-stone-900 truncate">{prof.full_name}</span>
-                            <span className="text-[10px] text-stone-500">{prof.phone} • {prof.address.substring(0, 30)}...</span>
-                          </button>
-                        ))
-                    ) : (
-                      <div className="text-[11px] text-stone-500 py-3 text-center">
-                        Ningún cliente encontrado.
-                        <button
-                          onClick={() => {
-                            setIsLoginDropdownOpen(false);
-                            setIsCustomerModalOpen(true);
-                          }}
-                          className="block mx-auto mt-1 text-[11px] text-amber-600 hover:underline font-bold"
-                        >
-                          Registrar Nuevo Cliente
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
               )}
             </div>
           </div>
@@ -3245,6 +3225,78 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
               >
                 Aceptar
               </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* DRAGGABLE LOGIN MODAL OVERLAY */}
+      <AnimatePresence>
+        {isLoginDropdownOpen && (
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-stone-900/70 backdrop-blur-xs">
+            <motion.div
+              drag
+              dragSnapToOrigin
+              dragElastic={0.12}
+              whileTap={{ cursor: 'grabbing' }}
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white w-full max-w-sm rounded-2xl p-5 sm:p-6 shadow-2xl border border-amber-200 space-y-4 cursor-grab text-stone-900"
+            >
+              <div className="flex items-center justify-between border-b border-stone-100 pb-2">
+                <span className="text-sm font-black text-stone-800 flex items-center gap-1.5">
+                  <User className="w-4 h-4 text-amber-600" /> Iniciar Sesión
+                </span>
+                <button
+                  onClick={() => setIsLoginDropdownOpen(false)}
+                  className="text-stone-400 hover:text-stone-600 p-1 rounded-md hover:bg-stone-100 transition cursor-pointer"
+                  title="Cerrar"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-xs text-stone-600 leading-relaxed font-medium">
+                  Ingresa tu número de teléfono registrado para iniciar sesión de cliente de forma segura.
+                </p>
+
+                <div>
+                  <label className="block text-xs font-extrabold uppercase text-stone-700 mb-1">
+                    Número de Teléfono
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej: 7845-9201"
+                    value={loginPhoneInput}
+                    onChange={(e) => setLoginPhoneInput(e.target.value)}
+                    className="w-full px-3 py-2 border border-amber-200/80 rounded-xl text-xs font-medium text-stone-900 focus:ring-1 focus:ring-amber-500 bg-amber-50/10 focus:outline-none"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleLoginSubmit();
+                      }
+                    }}
+                  />
+                </div>
+
+                <div className="pt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsLoginDropdownOpen(false)}
+                    className="flex-1 px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-extrabold rounded-xl transition cursor-pointer border border-stone-200"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleLoginSubmit}
+                    className="flex-1 px-3 py-2 bg-amber-500 hover:bg-amber-600 text-stone-950 text-xs font-extrabold rounded-xl transition cursor-pointer border border-amber-600 shadow-xs"
+                  >
+                    Ingresar
+                  </button>
+                </div>
+              </div>
             </motion.div>
           </div>
         )}
