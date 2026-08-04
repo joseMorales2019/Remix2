@@ -1388,54 +1388,54 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
       </AnimatePresence>
 
       {/* Hero Banner Header */}
-      <div className="bg-gradient-to-r from-amber-700 via-amber-600 to-red-700 text-white py-6 px-4 sm:px-6 lg:px-8 border-b border-amber-800/40 shadow-md">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-5">
-          <div className="space-y-1.5">
-            <div className="inline-flex items-center gap-2 bg-red-800/40 text-amber-200 px-3 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border border-amber-400/30">
-              <Truck className="w-3.5 h-3.5 text-amber-300" />
+      <div className="bg-gradient-to-r from-amber-700 via-amber-600 to-red-700 text-white py-4 px-3.5 sm:py-6 sm:px-6 lg:px-8 border-b border-amber-800/40 shadow-md">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="inline-flex items-center gap-1.5 bg-red-800/40 text-amber-200 px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold uppercase tracking-wider border border-amber-400/30">
+              <Truck className="w-3 h-3 text-amber-300" />
               Nuevo Servicio Nacional • El Salvador
             </div>
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-white flex items-center gap-2.5">
-              🛵 A Domicilio <span className="text-amber-200 text-xl sm:text-2xl font-normal">NewBank Store</span>
+            <h1 className="text-xl sm:text-3xl md:text-4xl font-black tracking-tight text-white flex items-center gap-2">
+              🛵 A Domicilio <span className="text-amber-200 text-base sm:text-2xl font-normal">NewBank Store</span>
             </h1>
-            <p className="text-amber-100/90 text-xs sm:text-sm max-w-2xl leading-relaxed">
+            <p className="text-amber-100/90 text-[11px] sm:text-sm max-w-2xl leading-relaxed">
               Pide directo a los mejores negocios locales, o registra tu propio comercio para recibir pedidos en tiempo real con geolocalización precisa.
             </p>
           </div>
 
           {/* Quick Action Badges */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
             <button
               onClick={() => handleTabSelect('explore')}
-              className={`px-3.5 py-2 rounded-xl font-extrabold text-xs uppercase tracking-wider transition flex items-center gap-2 ${
+              className={`px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl font-extrabold text-[10px] sm:text-xs uppercase tracking-wider transition flex items-center gap-1.5 ${
                 activeTab === 'explore'
                   ? 'bg-red-600 text-white shadow-md shadow-red-900/30 border border-red-500'
                   : 'bg-amber-800/40 text-amber-100 hover:bg-amber-800/60 border border-amber-400/20'
               }`}
             >
-              <Store className="w-4 h-4" />
+              <Store className="w-3.5 h-3.5" />
               Ver Mapa & Negocios
             </button>
             <button
               onClick={() => handleTabSelect('register_business')}
-              className={`px-3.5 py-2 rounded-xl font-extrabold text-xs uppercase tracking-wider transition flex items-center gap-2 ${
+              className={`px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl font-extrabold text-[10px] sm:text-xs uppercase tracking-wider transition flex items-center gap-1.5 ${
                 activeTab === 'register_business'
                   ? 'bg-red-600 text-white shadow-md shadow-red-900/30 border border-red-500'
                   : 'bg-amber-800/40 text-amber-100 hover:bg-amber-800/60 border border-amber-400/20'
               }`}
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-3.5 h-3.5" />
               Registrar Negocio
             </button>
             <button
               onClick={() => handleTabSelect('customer_profile')}
-              className={`px-3.5 py-2 rounded-xl font-extrabold text-xs uppercase tracking-wider transition flex items-center gap-2 ${
+              className={`px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl font-extrabold text-[10px] sm:text-xs uppercase tracking-wider transition flex items-center gap-1.5 ${
                 activeTab === 'customer_profile'
                   ? 'bg-red-600 text-white shadow-md shadow-red-900/30 border border-red-500'
                   : 'bg-amber-800/40 text-amber-100 hover:bg-amber-800/60 border border-amber-400/20'
               }`}
             >
-              <User className="w-4 h-4" />
+              <User className="w-3.5 h-3.5" />
               Mi Registro Cliente
             </button>
           </div>
@@ -1443,53 +1443,53 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
       </div>
 
       {/* Main Navigation Bar */}
-      <div ref={mainSectionRef} id="seccion-anclada" className="sticky top-12 z-30 bg-white border-b border-amber-200/80 shadow-xs px-3 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto flex items-center justify-between overflow-x-auto no-scrollbar py-2 gap-2">
-          <div className="flex items-center gap-1.5 sm:gap-2 min-w-max">
+      <div ref={mainSectionRef} id="seccion-anclada" className="sticky top-12 z-30 bg-white border-b border-amber-200/80 shadow-xs px-2 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto flex items-center justify-between overflow-x-auto no-scrollbar py-1.5 gap-2">
+          <div className="flex items-center gap-1 sm:gap-2 min-w-max">
             <button
               onClick={() => handleTabSelect('explore')}
-              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold flex items-center gap-2 transition ${
+              className={`px-2.5 py-1.5 rounded-xl text-[10px] xs:text-xs sm:text-sm font-extrabold flex items-center gap-1.5 transition ${
                 activeTab === 'explore'
                   ? 'bg-amber-500 text-stone-950 border border-amber-600 shadow-xs'
                   : 'text-stone-700 hover:bg-amber-50 hover:text-amber-950'
               }`}
             >
-              <MapPin className="w-4 h-4 text-red-600" />
+              <MapPin className="w-3.5 h-3.5 text-red-600" />
               1. Mapa & Negocios
             </button>
             <button
               onClick={() => handleTabSelect('register_business')}
-              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold flex items-center gap-2 transition ${
+              className={`px-2.5 py-1.5 rounded-xl text-[10px] xs:text-xs sm:text-sm font-extrabold flex items-center gap-1.5 transition ${
                 activeTab === 'register_business'
                   ? 'bg-amber-500 text-stone-950 border border-amber-600 shadow-xs'
                   : 'text-stone-700 hover:bg-amber-50 hover:text-amber-950'
               }`}
             >
-              <Store className="w-4 h-4 text-emerald-700" />
+              <Store className="w-3.5 h-3.5 text-emerald-700" />
               2. Registrar Negocio
             </button>
             <button
               onClick={() => handleTabSelect('manage_products')}
-              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold flex items-center gap-2 transition ${
+              className={`px-2.5 py-1.5 rounded-xl text-[10px] xs:text-xs sm:text-sm font-extrabold flex items-center gap-1.5 transition ${
                 activeTab === 'manage_products'
                   ? 'bg-amber-500 text-stone-950 border border-amber-600 shadow-xs'
                   : 'text-stone-700 hover:bg-amber-50 hover:text-amber-950'
               }`}
             >
-              <ShoppingBag className="w-4 h-4 text-amber-700" />
+              <ShoppingBag className="w-3.5 h-3.5 text-amber-700" />
               3. Mis Productos & Horarios
             </button>
             <button
               onClick={() => handleTabSelect('view_orders')}
-              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-extrabold flex items-center gap-2 transition ${
+              className={`px-2.5 py-1.5 rounded-xl text-[10px] xs:text-xs sm:text-sm font-extrabold flex items-center gap-1.5 transition ${
                 activeTab === 'view_orders'
                   ? 'bg-amber-500 text-stone-950 border border-amber-600 shadow-xs'
                   : 'text-stone-700 hover:bg-amber-50 hover:text-amber-950'
               }`}
             >
-              <Truck className="w-4 h-4 text-red-700" />
+              <Truck className="w-3.5 h-3.5 text-red-700" />
               4. Ver Solicitudes{' '}
-              <span className="bg-red-600 text-white px-2 py-0.5 rounded-full text-[11px] font-black">
+              <span className="bg-red-600 text-white px-1.5 py-0.5 rounded-full text-[9px] sm:text-[11px] font-black">
                 {orders.filter((o) => o.status === 'Pendiente').length}
               </span>
             </button>
@@ -1544,7 +1544,6 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
             {/* Search & Filter Header */}
             <motion.div
               drag
-              dragSnapToOrigin
               dragElastic={0.12}
               whileTap={{ cursor: 'grabbing' }}
               className="bg-white rounded-2xl p-3.5 sm:p-5 shadow-sm border border-amber-200/70 flex flex-col md:flex-row md:items-center justify-between gap-3 cursor-grab"
@@ -1578,47 +1577,45 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
             {/* Amplified Interactive Map Canvas Visualization (Requirement 5) */}
             <motion.div
               drag
-              dragSnapToOrigin
               dragElastic={0.12}
               whileTap={{ cursor: 'grabbing' }}
-              className="bg-stone-900 rounded-2xl text-white shadow-xl border border-stone-800 overflow-hidden relative cursor-grab"
+              className="bg-stone-900 rounded-2xl text-white shadow-xl border border-stone-800 overflow-hidden relative cursor-grab h-[360px] xs:h-[420px] sm:h-[543.55px]"
               style={{
                 borderStyle: 'dashed',
                 borderRadius: '11px',
                 borderWidth: '3.84px',
-                marginTop: '22px',
+                marginTop: '12px',
                 padding: '0px',
-                height: '543.55px',
               }}
             >
-              <div className="flex items-center justify-between mb-3.5 border-b border-stone-800 pb-3 p-4">
+              <div className="flex items-center justify-between mb-2 border-b border-stone-800 pb-2 p-3 sm:p-4">
                 <div className="flex items-center gap-2">
-                  <MapPin className="w-5 h-5 sm:w-6 sm:h-6 text-red-500 animate-bounce" />
+                  <MapPin className="w-4 h-4 sm:w-6 sm:h-6 text-red-500 animate-bounce" />
                   <div>
-                    <h2 className="text-base sm:text-lg font-black text-white">Mapa Ampliado de Comercios Registrados</h2>
-                    <p className="text-[11px] sm:text-xs text-stone-400">
-                      Coordenadas GPS reales de negocios con servicio a domicilio en El Salvador
+                    <h2 className="text-xs sm:text-lg font-black text-white">Mapa de Comercios Registrados</h2>
+                    <p className="text-[9px] sm:text-xs text-stone-400">
+                      Coordenadas GPS reales de negocios con servicio a domicilio
                     </p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2.5 text-xs">
-                  <span className="flex items-center gap-1 text-emerald-400 font-bold text-[11px] sm:text-xs">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block"></span> Abierto
+                <div className="flex items-center gap-2 text-[10px] sm:text-xs">
+                  <span className="flex items-center gap-1 text-emerald-400 font-bold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block"></span> Abierto
                   </span>
-                  <span className="flex items-center gap-1 text-rose-400 font-bold text-[11px] sm:text-xs">
-                    <span className="w-2 h-2 rounded-full bg-rose-500 inline-block"></span> Cerrado
+                  <span className="flex items-center gap-1 text-rose-400 font-bold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 inline-block"></span> Cerrado
                   </span>
                 </div>
               </div>
 
               {/* Google Maps Ampliado View for El Salvador con Leaflet nativo */}
-              <div className="w-full h-[460px] bg-stone-950 rounded-xl border border-stone-800 relative overflow-hidden isolate" style={{ height: '460px' }}>
+              <div className="w-full bg-stone-950 rounded-xl border border-stone-800 relative overflow-hidden isolate" style={{ height: 'calc(100% - 58px)' }}>
                 {/* Contenedor del mapa Leaflet */}
                 <div
                   ref={mapContainerRef}
                   className="w-full h-full rounded-xl z-0"
-                  style={{ minHeight: '350px', height: '100%' }}
+                  style={{ minHeight: '200px', height: '100%' }}
                 />
 
                 {/* Tarjeta flotante sobre el mapa al seleccionar un negocio */}
@@ -1630,34 +1627,33 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                   return (
                     <motion.div
                       drag
-                      dragSnapToOrigin
                       dragElastic={0.12}
                       whileTap={{ cursor: 'grabbing' }}
-                      className="absolute top-3 left-3 z-[9999] w-80 max-w-[calc(100%-1.5rem)] bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-amber-200 text-stone-900 overflow-hidden flex flex-col cursor-grab"
+                      className="absolute top-2 left-2 z-[9999] w-72 max-w-[calc(100%-1rem)] bg-white/95 backdrop-blur-md rounded-xl shadow-2xl border border-amber-200 text-stone-900 overflow-hidden flex flex-col cursor-grab"
                     >
-                      <div className="p-3.5 border-b border-amber-100 bg-amber-50/70 flex items-start justify-between gap-2">
-                        <div>
-                          <h3 className="text-base font-black text-stone-900 leading-tight">
+                      <div className="p-2.5 border-b border-amber-100 bg-amber-50/70 flex items-start justify-between gap-1.5">
+                        <div className="min-w-0">
+                          <h3 className="text-xs sm:text-sm font-black text-stone-900 leading-tight truncate">
                             {b.business_name}
                           </h3>
-                          <p className="text-[11px] text-stone-600 font-semibold flex items-center gap-1 mt-0.5">
-                            <User className="w-3 h-3 text-amber-700" />
-                            Propietario: <span className="font-bold text-stone-800">{b.owner_name}</span>
+                          <p className="text-[10px] text-stone-600 font-semibold flex items-center gap-1 mt-0.5 truncate">
+                            <User className="w-2.5 h-2.5 text-amber-700 shrink-0" />
+                            Prop: <span className="font-bold text-stone-800">{b.owner_name}</span>
                           </p>
                         </div>
                         <button
                           onClick={() => setSelectedBusiness(null)}
-                          className="text-stone-400 hover:text-stone-700 p-1 rounded-lg"
+                          className="text-stone-400 hover:text-stone-700 p-1 rounded-lg shrink-0"
                           title="Cerrar tarjeta"
                         >
-                          <X className="w-4 h-4" />
+                          <X className="w-3.5 h-3.5" />
                         </button>
                       </div>
 
-                      <div className="p-3.5 space-y-2 text-xs text-stone-700">
+                      <div className="p-2.5 space-y-1.5 text-[10px] sm:text-xs text-stone-700">
                         <div className="flex items-center justify-between">
                           <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                            className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
                               openStatus.isOpen
                                 ? 'bg-emerald-100 text-emerald-900 border border-emerald-300'
                                 : 'bg-rose-100 text-rose-900 border border-rose-300'
@@ -1666,58 +1662,58 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                             {openStatus.isOpen ? 'Abierto' : 'Cerrado'}
                           </span>
                           {b.delivery_paused && (
-                            <span className="px-2 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded-md text-[9px] font-black uppercase tracking-wider">
+                            <span className="px-1.5 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded text-[8px] font-black uppercase tracking-wider">
                               🔴 Sin Envíos
                             </span>
                           )}
                         </div>
 
-                        <p className="flex items-center gap-1.5">
-                          <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                          <span className="font-semibold text-stone-800">{openStatus.label}</span>
+                        <p className="flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-amber-600 shrink-0" />
+                          <span className="font-semibold text-stone-800 truncate">{openStatus.label}</span>
                         </p>
-                        <p className="flex items-center gap-1.5">
-                          <Phone className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                        <p className="flex items-center gap-1">
+                          <Phone className="w-3 h-3 text-amber-600 shrink-0" />
                           <span><strong>{b.phone}</strong></span>
                         </p>
-                        <p className="flex items-center gap-1.5">
-                          <MapPin className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                        <p className="flex items-center gap-1">
+                          <MapPin className="w-3 h-3 text-red-600 shrink-0" />
                           <span className="truncate">{b.address_text || 'Ubicación GPS registrada'}</span>
                         </p>
                       </div>
 
                       {/* List of Products inside floating card */}
-                      <div className="px-3.5 py-2 max-h-40 overflow-y-auto space-y-2 border-t border-amber-100">
-                        <div className="flex items-center justify-between text-[11px] font-bold text-stone-500 uppercase tracking-wider mb-1">
-                          <span>Productos Disponibles ({bizProducts.length})</span>
+                      <div className="px-2.5 py-1.5 max-h-24 sm:max-h-40 overflow-y-auto space-y-1.5 border-t border-amber-100">
+                        <div className="flex items-center justify-between text-[9px] font-bold text-stone-500 uppercase tracking-wider mb-0.5">
+                          <span>Productos ({bizProducts.length})</span>
                           <span>Envío</span>
                         </div>
 
                         {bizProducts.map((p) => (
                           <div
                             key={p.id}
-                            className="flex items-center justify-between p-2 rounded-xl bg-amber-50/40 hover:bg-amber-100/50 border border-amber-100 transition text-xs"
+                            className="flex items-center justify-between p-1.5 rounded-lg bg-amber-50/40 hover:bg-amber-100/50 border border-amber-100 transition text-[10px]"
                           >
-                            <div className="flex items-center gap-2 min-w-0">
+                            <div className="flex items-center gap-1.5 min-w-0">
                               <img
                                 src={p.image_url}
                                 alt={p.name}
-                                className="w-8 h-8 rounded-lg object-cover border border-amber-200"
+                                className="w-7 h-7 rounded object-cover border border-amber-200"
                               />
                               <div className="min-w-0">
-                                <p className="font-extrabold text-stone-900 truncate">{p.name}</p>
-                                <p className="text-red-700 font-black">${p.price.toFixed(2)}</p>
+                                <p className="font-extrabold text-stone-900 truncate leading-tight">{p.name}</p>
+                                <p className="text-red-700 font-black text-[9px]">${p.price.toFixed(2)}</p>
                               </div>
                             </div>
 
                             <div>
                               {p.disponible_domicilio ? (
-                                <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-900 font-bold text-[9px] flex items-center gap-0.5">
-                                  <Truck className="w-2.5 h-2.5 text-emerald-700" /> Domicilio
+                                <span className="px-1 py-0.5 rounded bg-emerald-100 text-emerald-900 font-bold text-[8px] flex items-center gap-0.5">
+                                  <Truck className="w-2 h-2 text-emerald-700" /> Domicilio
                                 </span>
                               ) : (
-                                <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-bold text-[9px] flex items-center gap-0.5">
-                                  <Store className="w-2.5 h-2.5 text-amber-700" /> Local
+                                <span className="px-1 py-0.5 rounded bg-amber-100 text-amber-900 font-bold text-[8px] flex items-center gap-0.5">
+                                  <Store className="w-2 h-2 text-amber-700" /> Local
                                 </span>
                               )}
                             </div>
@@ -1725,40 +1721,40 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                         ))}
 
                         {bizProducts.length === 0 && (
-                          <p className="text-[11px] text-stone-400 italic text-center py-2">
-                            No hay productos registrados en este negocio.
+                          <p className="text-[10px] text-stone-400 italic text-center py-1">
+                            Sin productos.
                           </p>
                         )}
                       </div>
 
-                      <div className="p-3 bg-amber-50/60 border-t border-amber-100 flex items-center gap-2">
+                      <div className="p-2 bg-amber-50/60 border-t border-amber-100 flex flex-wrap sm:flex-nowrap gap-1.5">
                         <button
                           onClick={() => {
                             setOrderingBusiness(b);
                             setIsOrderingModalOpen(true);
                           }}
-                          className="flex-1 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black py-2 px-3 rounded-xl text-xs uppercase tracking-wider transition shadow-sm flex items-center justify-center gap-1.5"
+                          className="flex-1 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black py-1.5 px-2.5 rounded-lg text-[9px] sm:text-xs uppercase tracking-wider transition shadow-sm flex items-center justify-center gap-1"
                         >
-                          <ShoppingBag className="w-3.5 h-3.5" />
-                          Solicitar Productos
+                          <ShoppingBag className="w-3 h-3" />
+                          Pedir
                         </button>
                         <button
                           onClick={() => {
                             setManagingBusinessId(b.id);
                             setActiveTab('view_orders');
                           }}
-                          title="Ver solicitudes de este negocio"
-                          className="p-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl transition shadow-xs flex items-center gap-1 text-[11px] font-extrabold"
+                          title="Ver solicitudes"
+                          className="px-2 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition shadow-xs flex items-center gap-1 text-[9px] font-extrabold"
                         >
-                          <Truck className="w-3.5 h-3.5 text-amber-200" />
-                          Ver Solicitudes
+                          <Truck className="w-3 h-3 text-amber-200" />
+                          Solicitudes
                         </button>
                         <button
                           onClick={() => downloadBusinessQRCode(b)}
-                          title="Descargar QR"
-                          className="p-2 bg-red-700 hover:bg-red-800 text-white rounded-xl transition shadow-xs"
+                          title="QR"
+                          className="p-1.5 bg-red-700 hover:bg-red-800 text-white rounded-lg transition shadow-xs"
                         >
-                          <QrCode className="w-4 h-4 text-amber-200" />
+                          <QrCode className="w-3 h-3 text-amber-200" />
                         </button>
                       </div>
                     </motion.div>
@@ -1784,7 +1780,6 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
         {activeTab === 'register_business' && (
           <motion.div
             drag
-            dragSnapToOrigin
             dragElastic={0.12}
             whileTap={{ cursor: 'grabbing' }}
             className="max-w-3xl mx-auto bg-white rounded-2xl p-4 sm:p-6 md:p-8 shadow-sm border border-amber-200/70 cursor-grab"
@@ -1812,7 +1807,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                     placeholder="Ej. María Elena Ramos"
                     value={bizOwnerName}
                     onChange={(e) => setBizOwnerName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-amber-200/80 focus:ring-2 focus:ring-amber-500 text-xs sm:text-sm font-medium bg-amber-50/10 text-stone-900"
+                    className="w-full px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl border border-amber-200/80 focus:ring-2 focus:ring-amber-500 text-xs sm:text-sm font-medium bg-amber-50/10 text-stone-900"
                   />
                 </div>
 
@@ -1826,7 +1821,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                     placeholder="Ej. 7845-9201"
                     value={bizPhone}
                     onChange={(e) => setBizPhone(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-amber-200/80 focus:ring-2 focus:ring-amber-500 text-xs sm:text-sm font-medium bg-amber-50/10 text-stone-900"
+                    className="w-full px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl border border-amber-200/80 focus:ring-2 focus:ring-amber-500 text-xs sm:text-sm font-medium bg-amber-50/10 text-stone-900"
                   />
                 </div>
               </div>
@@ -1842,7 +1837,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                   placeholder="Ej. Pupusería Doña María"
                   value={bizName}
                   onChange={(e) => setBizName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-amber-200/80 focus:ring-2 focus:ring-amber-500 text-xs sm:text-sm font-medium bg-amber-50/10 text-stone-900"
+                  className="w-full px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl border border-amber-200/80 focus:ring-2 focus:ring-amber-500 text-xs sm:text-sm font-medium bg-amber-50/10 text-stone-900"
                 />
               </div>
 
@@ -1855,7 +1850,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                   placeholder="Ej. Colonia Escalón, Calle El Mirador #402, San Salvador"
                   value={bizAddressText}
                   onChange={(e) => setBizAddressText(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-amber-200/80 focus:ring-2 focus:ring-amber-500 text-xs sm:text-sm font-medium bg-amber-50/10 text-stone-900"
+                  className="w-full px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl border border-amber-200/80 focus:ring-2 focus:ring-amber-500 text-xs sm:text-sm font-medium bg-amber-50/10 text-stone-900"
                 />
               </div>
 
@@ -2049,7 +2044,6 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
             {myManageableBusinesses.length === 0 ? (
               <motion.div
                 drag
-                dragSnapToOrigin
                 dragElastic={0.12}
                 whileTap={{ cursor: 'grabbing' }}
                 className="bg-white rounded-3xl p-12 text-center border border-slate-200 shadow-sm space-y-4 max-w-xl mx-auto my-12 cursor-grab"
@@ -2071,7 +2065,6 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                 {/* Business Selector */}
                 <motion.div
                   drag
-                  dragSnapToOrigin
                   dragElastic={0.12}
                   whileTap={{ cursor: 'grabbing' }}
                   className="bg-white rounded-2xl p-3.5 sm:p-5 border border-amber-200/70 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-grab"
@@ -2145,7 +2138,6 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                 {/* Visualizar Horarios Registrados del Negocio (Requirement 4) */}
                 <motion.div
                   drag
-                  dragSnapToOrigin
                   dragElastic={0.12}
                   whileTap={{ cursor: 'grabbing' }}
                   className="bg-white rounded-2xl p-4 sm:p-5 border border-amber-200/70 shadow-sm space-y-3.5 cursor-grab"
@@ -2244,7 +2236,6 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                 {/* Listado de Productos Registrados (Requirement 4) */}
                 <motion.div
                   drag
-                  dragSnapToOrigin
                   dragElastic={0.12}
                   whileTap={{ cursor: 'grabbing' }}
                   className="lg:col-span-2 bg-white rounded-2xl p-4 sm:p-5 border border-amber-200/70 shadow-sm space-y-3.5 cursor-grab"
@@ -2264,7 +2255,6 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                       .map((p) => (
                         <motion.div
                           drag
-                          dragSnapToOrigin
                           dragElastic={0.12}
                           whileTap={{ cursor: 'grabbing' }}
                           key={p.id}
@@ -2344,7 +2334,6 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
               {/* Opción para ver los productos solicitados al negocio y controlar las entregas (Requirement 3 & 4) */}
               <motion.div
                 drag
-                dragSnapToOrigin
                 dragElastic={0.12}
                 whileTap={{ cursor: 'grabbing' }}
                 className="bg-white rounded-2xl p-4 sm:p-5 border border-amber-200/70 shadow-sm space-y-4 cursor-grab"
@@ -2473,7 +2462,6 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
             {/* Header & Filters */}
             <motion.div
               drag
-              dragSnapToOrigin
               dragElastic={0.12}
               whileTap={{ cursor: 'grabbing' }}
               className="bg-white rounded-2xl p-3.5 sm:p-5 border border-amber-200/70 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3 cursor-grab"
@@ -2551,7 +2539,6 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
               {currentBizOrders.map((ord) => (
                 <motion.div
                   drag
-                  dragSnapToOrigin
                   dragElastic={0.12}
                   whileTap={{ cursor: 'grabbing' }}
                   key={ord.id}
@@ -2655,7 +2642,6 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
         {activeTab === 'customer_profile' && (
           <motion.div
             drag
-            dragSnapToOrigin
             dragElastic={0.12}
             whileTap={{ cursor: 'grabbing' }}
             className="max-w-2xl mx-auto bg-white rounded-2xl p-4 sm:p-6 md:p-8 shadow-sm border border-amber-200/70 space-y-5 cursor-grab"
@@ -2680,7 +2666,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                   placeholder="Ej. José Manuel Mejía"
                   value={custName}
                   onChange={(e) => setCustName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-amber-200/80 focus:ring-2 focus:ring-amber-500 text-xs sm:text-sm font-medium bg-amber-50/10 text-stone-900"
+                  className="w-full px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl border border-amber-200/80 focus:ring-2 focus:ring-amber-500 text-xs sm:text-sm font-medium bg-amber-50/10 text-stone-900"
                 />
               </div>
 
@@ -2694,7 +2680,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                   placeholder="Ej. 7000-1122"
                   value={custPhone}
                   onChange={(e) => setCustPhone(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-amber-200/80 focus:ring-2 focus:ring-amber-500 text-xs sm:text-sm font-medium bg-amber-50/10 text-stone-900"
+                  className="w-full px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl border border-amber-200/80 focus:ring-2 focus:ring-amber-500 text-xs sm:text-sm font-medium bg-amber-50/10 text-stone-900"
                 />
               </div>
 
@@ -2708,7 +2694,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                   placeholder="Ej. Colonia San Benito, Calle La Mascota #14, San Salvador"
                   value={custAddress}
                   onChange={(e) => setCustAddress(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-amber-200/80 focus:ring-2 focus:ring-amber-500 text-xs sm:text-sm font-medium bg-amber-50/10 text-stone-900"
+                  className="w-full px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl border border-amber-200/80 focus:ring-2 focus:ring-amber-500 text-xs sm:text-sm font-medium bg-amber-50/10 text-stone-900"
                 />
               </div>
 
@@ -2762,7 +2748,6 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
           <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-stone-900/65 backdrop-blur-xs overflow-y-auto">
             <motion.div
               drag
-              dragSnapToOrigin
               dragElastic={0.12}
               whileTap={{ cursor: 'grabbing' }}
               initial={{ scale: 0.95, opacity: 0 }}
@@ -2943,7 +2928,6 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
           <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-stone-900/70 backdrop-blur-xs">
             <motion.div
               drag
-              dragSnapToOrigin
               dragElastic={0.12}
               whileTap={{ cursor: 'grabbing' }}
               initial={{ scale: 0.95, opacity: 0 }}
@@ -3044,7 +3028,6 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
           <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-stone-900/60 backdrop-blur-xs">
             <motion.div
               drag
-              dragSnapToOrigin
               dragElastic={0.12}
               whileTap={{ cursor: 'grabbing' }}
               initial={{ scale: 0.95, opacity: 0 }}
@@ -3208,7 +3191,6 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
           <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-stone-900/70 backdrop-blur-xs">
             <motion.div
               drag
-              dragSnapToOrigin
               dragElastic={0.12}
               whileTap={{ cursor: 'grabbing' }}
               initial={{ scale: 0.9, opacity: 0 }}
@@ -3249,7 +3231,6 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
           <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-stone-900/70 backdrop-blur-xs">
             <motion.div
               drag
-              dragSnapToOrigin
               dragElastic={0.12}
               whileTap={{ cursor: 'grabbing' }}
               initial={{ scale: 0.95, opacity: 0 }}
