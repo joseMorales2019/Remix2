@@ -881,7 +881,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
       longitude: bizLng,
       address_text: bizAddressText.trim() || 'El Salvador',
       created_at: new Date().toISOString(),
-      user_id: user?.id
+      user_id: user?.id || customerProfile?.id || null
     };
 
     const updated = [newBiz, ...businesses];
@@ -1255,7 +1255,20 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
 
   const canUserManageBusiness = (b: DomicilioBusiness) => {
     if (!b) return false;
+    
+    // Normalize phone numbers for precise match
+    const cleanPhone = (p: string) => (p || '').replace(/\D/g, '').trim();
+    const loggedInPhone = (customerProfile?.phone || user?.phone || '').trim();
+    const cleanedLoggedInPhone = cleanPhone(loggedInPhone);
+    const cleanedBusinessPhone = cleanPhone(b.phone || '');
+
+    if (cleanedLoggedInPhone && cleanedBusinessPhone && cleanedLoggedInPhone === cleanedBusinessPhone) {
+      return true;
+    }
+
     if (user?.id && b.user_id && b.user_id === user.id) return true;
+    if (customerProfile?.id && b.user_id && b.user_id === customerProfile.id) return true;
+
     const currentName = (user?.full_name || customerProfile?.full_name || bizOwnerName || '').toLowerCase().trim();
     if (currentName && b.owner_name && b.owner_name.toLowerCase().trim() === currentName) return true;
     if (b.id && b.id.startsWith('biz_') && b.id !== 'biz_1' && b.id !== 'biz_2' && b.id !== 'biz_3') return true;
