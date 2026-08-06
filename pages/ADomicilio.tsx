@@ -426,6 +426,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
   const [deliveryType, setDeliveryType] = useState<'personal' | 'domicilio'>('domicilio');
   const [cart, setCart] = useState<{ [productId: string]: number }>({});
   const [itemNotes, setItemNotes] = useState<{ [productId: string]: string }>({});
+  const [customDollarInputs, setCustomDollarInputs] = useState<{ [productId: string]: string }>({});
   const [orderNote, setOrderNote] = useState('');
   const [orderAddressInput, setOrderAddressInput] = useState('');
   const [isOrderingModalOpen, setIsOrderingModalOpen] = useState(false);
@@ -1271,6 +1272,31 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
         return prev;
       });
     }
+  };
+
+  const handleAddByDollarAmount = (productId: string, dollarAmount: number, productName: string, price: number) => {
+    if (price <= 0 || dollarAmount <= 0) return;
+    const unitsToAdd = Math.max(1, Math.round(dollarAmount / price));
+    const calcSubtotal = unitsToAdd * price;
+
+    setCart((prev) => {
+      const currentQty = prev[productId] || 0;
+      return { ...prev, [productId]: currentQty + unitsToAdd };
+    });
+
+    setItemNotes((prev) => {
+      const currentNote = prev[productId] || '';
+      const dollarNoteStr = `$${dollarAmount.toFixed(2)} de ${productName}`;
+      if (!currentNote) {
+        return { ...prev, [productId]: dollarNoteStr };
+      }
+      if (!currentNote.includes(`$${dollarAmount.toFixed(2)}`)) {
+        return { ...prev, [productId]: `${currentNote} | ${dollarNoteStr}` };
+      }
+      return prev;
+    });
+
+    showToast(`💵 Agregado $${dollarAmount.toFixed(2)} de ${productName} (${unitsToAdd} unids = $${calcSubtotal.toFixed(2)})`);
   };
 
   const getCartItemsList = () => {
@@ -3181,13 +3207,18 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
 
               {/* Products Catalog Filtered by Delivery Type (Requirement 6) */}
               <div className="space-y-2.5">
-                <h4 className="text-xs font-extrabold uppercase text-stone-600">
-                  {deliveryType === 'domicilio'
-                    ? 'Productos Disponibles para Envío a Domicilio:'
-                    : 'Todos los Productos del Negocio:'}
-                </h4>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <h4 className="text-xs font-extrabold uppercase text-stone-600">
+                    {deliveryType === 'domicilio'
+                      ? 'Productos Disponibles para Envío a Domicilio:'
+                      : 'Todos los Productos del Negocio:'}
+                  </h4>
+                  <p className="text-[10px] text-amber-800 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200/80">
+                    💡 ¡Puedes pedir por unidades (+/-) o por monto en dólares ($)!
+                  </p>
+                </div>
 
-                <div className="max-h-60 overflow-y-auto space-y-2 pr-1 border border-amber-200/70 rounded-xl p-2.5 bg-amber-50/20">
+                <div className="max-h-64 overflow-y-auto space-y-2 pr-1 border border-amber-200/70 rounded-xl p-2.5 bg-amber-50/20">
                   {products
                     .filter((p) => p.business_id === biz.id && !p.is_hidden)
                     .filter((p) => (deliveryType === 'domicilio' ? p.disponible_domicilio : true))
@@ -3213,25 +3244,82 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                                 >
                                   {p.name}
                                 </p>
-                                <p className="text-red-700 font-black text-xs">${p.price.toFixed(2)}</p>
+                                <p className="text-red-700 font-black text-xs">${p.price.toFixed(2)} c/u</p>
                               </div>
                             </div>
 
                             {/* Quantity selector */}
                             <div className="flex items-center gap-1.5 bg-stone-100 p-1 rounded-lg">
                               <button
+                                type="button"
                                 onClick={() => handleQuantityChange(p.id, -1)}
-                                className="w-6 h-6 bg-white border border-stone-300 text-stone-800 font-black rounded flex items-center justify-center text-xs"
+                                className="w-6 h-6 bg-white border border-stone-300 text-stone-800 font-black rounded flex items-center justify-center text-xs cursor-pointer"
                               >
                                 -
                               </button>
                               <span className="w-6 text-center text-xs font-black text-stone-900">{qty}</span>
                               <button
+                                type="button"
                                 onClick={() => handleQuantityChange(p.id, 1)}
-                                className="w-6 h-6 bg-amber-500 text-stone-950 font-black rounded flex items-center justify-center text-xs"
+                                className="w-6 h-6 bg-amber-500 text-stone-950 font-black rounded flex items-center justify-center text-xs cursor-pointer"
                               >
                                 +
                               </button>
+                            </div>
+                          </div>
+
+                          {/* Opción Rápida: Pedir por Dólares ($) */}
+                          <div className="pt-2 border-t border-amber-100/70 flex flex-wrap items-center justify-between gap-1.5 text-[11px]">
+                            <div className="flex items-center gap-1 font-bold text-stone-700">
+                              <span>💵 Pedir por Dólares ($):</span>
+                            </div>
+                            <div className="flex items-center gap-1 flex-wrap">
+                              {[1, 2, 3, 5].map((dollar) => (
+                                <button
+                                  key={dollar}
+                                  type="button"
+                                  onClick={() => handleAddByDollarAmount(p.id, dollar, p.name, p.price)}
+                                  className="px-2 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300/80 rounded-md font-black transition cursor-pointer"
+                                  title={`Pedir $${dollar}.00 de ${p.name}`}
+                                >
+                                  +${dollar}
+                                </button>
+                              ))}
+                              <div className="flex items-center gap-1 ml-1">
+                                <span className="text-stone-400 font-bold">$</span>
+                                <input
+                                  type="number"
+                                  step="0.25"
+                                  min="0.25"
+                                  placeholder="Monto"
+                                  value={customDollarInputs[p.id] || ''}
+                                  onChange={(e) => setCustomDollarInputs(prev => ({ ...prev, [p.id]: e.target.value }))}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      const val = parseFloat(customDollarInputs[p.id] || '0');
+                                      if (val > 0) {
+                                        handleAddByDollarAmount(p.id, val, p.name, p.price);
+                                        setCustomDollarInputs(prev => ({ ...prev, [p.id]: '' }));
+                                      }
+                                    }
+                                  }}
+                                  className="w-14 px-1.5 py-0.5 border border-amber-200 rounded-md text-[11px] font-bold text-stone-900 bg-white"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const val = parseFloat(customDollarInputs[p.id] || '0');
+                                    if (val > 0) {
+                                      handleAddByDollarAmount(p.id, val, p.name, p.price);
+                                      setCustomDollarInputs(prev => ({ ...prev, [p.id]: '' }));
+                                    }
+                                  }}
+                                  className="px-2 py-0.5 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black rounded-md text-[10px] transition cursor-pointer"
+                                >
+                                  Pedir
+                                </button>
+                              </div>
                             </div>
                           </div>
 
