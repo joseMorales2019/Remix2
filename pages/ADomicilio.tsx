@@ -425,6 +425,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
   // Cart & Order Workflow States
   const [deliveryType, setDeliveryType] = useState<'personal' | 'domicilio'>('domicilio');
   const [cart, setCart] = useState<{ [productId: string]: number }>({});
+  const [cartDollarAmounts, setCartDollarAmounts] = useState<{ [productId: string]: number }>({});
   const [itemNotes, setItemNotes] = useState<{ [productId: string]: string }>({});
   const [customDollarInputs, setCustomDollarInputs] = useState<{ [productId: string]: string }>({});
   const [orderNote, setOrderNote] = useState('');
@@ -1275,21 +1276,35 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
 
   // Order Placement Workflow (Requirement 6 & 8)
   const handleQuantityChange = (productId: string, delta: number) => {
+    const currentQty = cart[productId] || 0;
+    const newQty = Math.max(0, currentQty + delta);
+
     setCart((prev) => {
-      const current = prev[productId] || 0;
-      const updated = Math.max(0, current + delta);
-      if (updated === 0) {
+      if (newQty === 0) {
         const copy = { ...prev };
         delete copy[productId];
         return copy;
       }
-      return { ...prev, [productId]: updated };
+      return { ...prev, [productId]: newQty };
+    });
+
+    setCartDollarAmounts((prev) => {
+      const currentDollar = prev[productId];
+      if (currentDollar !== undefined && currentQty > 0) {
+        if (newQty === 0) {
+          const copy = { ...prev };
+          delete copy[productId];
+          return copy;
+        }
+        const unitDollar = currentDollar / currentQty;
+        return { ...prev, [productId]: Math.max(0, currentDollar + unitDollar * delta) };
+      }
+      return prev;
     });
 
     if (delta < 0) {
       setItemNotes((prev) => {
-        const currentQty = cart[productId] || 0;
-        if (currentQty + delta <= 0 && prev[productId]) {
+        if (newQty === 0 && prev[productId]) {
           const copy = { ...prev };
           delete copy[productId];
           return copy;
@@ -1316,11 +1331,15 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
     } else {
       return;
     }
-    const calcSubtotal = unitsToAdd * price;
 
     setCart((prev) => {
       const currentQty = prev[productId] || 0;
       return { ...prev, [productId]: currentQty + unitsToAdd };
+    });
+
+    setCartDollarAmounts((prev) => {
+      const currentDollar = prev[productId] || 0;
+      return { ...prev, [productId]: currentDollar + dollarAmount };
     });
 
     setItemNotes((prev) => {
@@ -1335,7 +1354,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
       return prev;
     });
 
-    showToast(`💵 Agregado $${dollarAmount.toFixed(2)} de ${productName} (${unitsToAdd} unids = $${calcSubtotal.toFixed(2)})`);
+    showToast(`💵 Agregado $${dollarAmount.toFixed(2)} de ${productName} (${unitsToAdd} unids)`);
   };
 
   const getCartItemsList = () => {
@@ -1349,12 +1368,21 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
         const qty = cart[pId];
         if (!qty || qty <= 0) return null;
         const note = itemNotes[pId]?.trim();
+        const dollarAmount = cartDollarAmounts[pId];
+
+        // Direct subtotal from requested dollar amount if present, or prod.price * qty
+        const subtotal = (dollarAmount !== undefined && dollarAmount > 0)
+          ? dollarAmount
+          : prod.price * qty;
+
+        const effectiveUnitPrice = qty > 0 ? subtotal / qty : prod.price;
+
         return {
           product_id: prod.id,
           product_name: prod.name,
-          unit_price: prod.price,
+          unit_price: effectiveUnitPrice,
           quantity: qty,
-          subtotal: prod.price * qty,
+          subtotal: subtotal,
           image_url: prod.image_url,
           item_note: note || undefined
         };
@@ -1445,6 +1473,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
     showToast(`🔔 ¡Pedido realizado! Notificación Push emitida a ${biz.business_name}`);
     setOrderSuccessOrder(newOrder);
     setCart({});
+    setCartDollarAmounts({});
     setItemNotes({});
     setOrderNote('');
     setIsOrderingModalOpen(false);
@@ -3440,6 +3469,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                   <button
                     onClick={() => {
                       setCart({});
+                      setCartDollarAmounts({});
                       setItemNotes({});
                       showToast('🧹 Selección limpiada. Puedes agregar otros productos.');
                     }}
