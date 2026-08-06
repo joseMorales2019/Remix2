@@ -481,6 +481,9 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [prodName, setProdName] = useState('');
   const [prodPrice, setProdPrice] = useState<number | ''>('');
+  const [prodUnitsPerDeal, setProdUnitsPerDeal] = useState<number | ''>('');
+  const [prodDealPrice, setProdDealPrice] = useState<number | ''>('');
+  const [prodDealNote, setProdDealNote] = useState('');
 
   const canUserManageBusiness = (b: DomicilioBusiness) => {
     if (!b) return false;
@@ -1093,14 +1096,27 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
       showToast('⚠️ Acceso denegado: Solo el creador de este negocio puede administrarlo');
       return;
     }
-    if (!prodName.trim() || prodPrice === '' || Number(prodPrice) <= 0) {
-      showToast('⚠️ Ingresa un nombre y precio válido para el producto');
+    let effectivePrice = prodPrice === '' ? 0 : Number(prodPrice);
+    if ((effectivePrice <= 0) && prodUnitsPerDeal && prodDealPrice && Number(prodUnitsPerDeal) > 0 && Number(prodDealPrice) > 0) {
+      effectivePrice = parseFloat((Number(prodDealPrice) / Number(prodUnitsPerDeal)).toFixed(4));
+    }
+
+    if (!prodName.trim() || effectivePrice <= 0) {
+      showToast('⚠️ Ingresa un nombre y precio o proporción de dólares válida para el producto');
       return;
     }
 
     const imgToUse =
       prodImage.trim() ||
       'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=600&q=80';
+
+    let finalDealNote = prodDealNote.trim();
+    if (!finalDealNote && prodUnitsPerDeal && prodDealPrice) {
+      finalDealNote = `${prodUnitsPerDeal} por $${Number(prodDealPrice).toFixed(2)}`;
+    }
+
+    const numUnits = prodUnitsPerDeal !== '' && Number(prodUnitsPerDeal) > 0 ? Number(prodUnitsPerDeal) : undefined;
+    const numDealPrice = prodDealPrice !== '' && Number(prodDealPrice) > 0 ? Number(prodDealPrice) : undefined;
 
     if (editingProductId) {
       // Edit
@@ -1109,9 +1125,12 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
           ? {
               ...p,
               name: prodName.trim(),
-              price: Number(prodPrice),
+              price: effectivePrice,
               image_url: imgToUse,
-              disponible_domicilio: prodDisponibleDomicilio
+              disponible_domicilio: prodDisponibleDomicilio,
+              units_per_deal: numUnits,
+              deal_price: numDealPrice,
+              deal_note: finalDealNote || undefined
             }
           : p
       );
@@ -1123,11 +1142,14 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
         id: generateUUID(),
         business_id: managingBusinessId,
         name: prodName.trim(),
-        price: Number(prodPrice),
+        price: effectivePrice,
         image_url: imgToUse,
         disponible_domicilio: prodDisponibleDomicilio,
         is_hidden: false,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        units_per_deal: numUnits,
+        deal_price: numDealPrice,
+        deal_note: finalDealNote || undefined
       };
       updateProducts([newProd, ...products]);
       showToast('🎉 Producto registrado exitosamente');
@@ -1140,6 +1162,9 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
     setProdPrice('');
     setProdImage('');
     setProdDisponibleDomicilio(true);
+    setProdUnitsPerDeal('');
+    setProdDealPrice('');
+    setProdDealNote('');
   };
 
   const handleToggleProductVisibility = (productId: string) => {
@@ -1274,9 +1299,23 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
     }
   };
 
-  const handleAddByDollarAmount = (productId: string, dollarAmount: number, productName: string, price: number) => {
-    if (price <= 0 || dollarAmount <= 0) return;
-    const unitsToAdd = Math.max(1, Math.round(dollarAmount / price));
+  const handleAddByDollarAmount = (
+    productId: string,
+    dollarAmount: number,
+    productName: string,
+    price: number,
+    unitsPerDeal?: number,
+    dealPrice?: number
+  ) => {
+    if (dollarAmount <= 0) return;
+    let unitsToAdd = 0;
+    if (unitsPerDeal && dealPrice && dealPrice > 0) {
+      unitsToAdd = Math.max(1, Math.round((dollarAmount / dealPrice) * unitsPerDeal));
+    } else if (price > 0) {
+      unitsToAdd = Math.max(1, Math.round(dollarAmount / price));
+    } else {
+      return;
+    }
     const calcSubtotal = unitsToAdd * price;
 
     setCart((prev) => {
@@ -2416,6 +2455,9 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                           setProdPrice('');
                           setProdImage('');
                           setProdDisponibleDomicilio(true);
+                          setProdUnitsPerDeal('');
+                          setProdDealPrice('');
+                          setProdDealNote('');
                           setIsProductModalOpen(true);
                         }}
                         className="px-3.5 py-2.5 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black text-xs uppercase tracking-wider rounded-xl shadow-xs transition flex items-center gap-1.5"
@@ -2595,7 +2637,14 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                                   </span>
                                 )}
                               </div>
-                              <p className="text-red-700 font-black text-sm sm:text-base">${p.price.toFixed(2)}</p>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-red-700 font-black text-sm sm:text-base">${p.price.toFixed(2)} c/u</p>
+                                {(p.deal_note || (p.units_per_deal && p.deal_price)) && (
+                                  <span className="px-2 py-0.5 bg-amber-100 text-amber-950 text-[10px] sm:text-xs font-black rounded-lg border border-amber-300/80 flex items-center gap-1">
+                                    🏷️ {p.deal_note || `${p.units_per_deal} unids por $${p.deal_price?.toFixed(2)}`}
+                                  </span>
+                                )}
+                              </div>
                               <p className="text-[11px] text-stone-600">
                                 Envío a Domicilio: {p.disponible_domicilio ? '✅ Sí' : '❌ No (Solo Retiro)'}
                               </p>
@@ -2611,6 +2660,9 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                                 setProdPrice(p.price);
                                 setProdImage(p.image_url);
                                 setProdDisponibleDomicilio(p.disponible_domicilio);
+                                setProdUnitsPerDeal(p.units_per_deal || '');
+                                setProdDealPrice(p.deal_price || '');
+                                setProdDealNote(p.deal_note || '');
                                 setIsProductModalOpen(true);
                               }}
                               className="p-2 bg-stone-100 hover:bg-amber-50 text-stone-700 rounded-lg text-xs font-bold flex items-center gap-1"
@@ -3244,7 +3296,14 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                                 >
                                   {p.name}
                                 </p>
-                                <p className="text-red-700 font-black text-xs">${p.price.toFixed(2)} c/u</p>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <p className="text-red-700 font-black text-xs">${p.price.toFixed(2)} c/u</p>
+                                  {(p.deal_note || (p.units_per_deal && p.deal_price)) && (
+                                    <span className="px-1.5 py-0.5 bg-amber-100 text-amber-950 text-[10px] font-black rounded border border-amber-300/80">
+                                      🏷️ {p.deal_note || `${p.units_per_deal} por $${p.deal_price?.toFixed(2)}`}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
 
@@ -3278,7 +3337,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                                 <button
                                   key={dollar}
                                   type="button"
-                                  onClick={() => handleAddByDollarAmount(p.id, dollar, p.name, p.price)}
+                                  onClick={() => handleAddByDollarAmount(p.id, dollar, p.name, p.price, p.units_per_deal, p.deal_price)}
                                   className="px-2 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300/80 rounded-md font-black transition cursor-pointer"
                                   title={`Pedir $${dollar}.00 de ${p.name}`}
                                 >
@@ -3299,7 +3358,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                                       e.preventDefault();
                                       const val = parseFloat(customDollarInputs[p.id] || '0');
                                       if (val > 0) {
-                                        handleAddByDollarAmount(p.id, val, p.name, p.price);
+                                        handleAddByDollarAmount(p.id, val, p.name, p.price, p.units_per_deal, p.deal_price);
                                         setCustomDollarInputs(prev => ({ ...prev, [p.id]: '' }));
                                       }
                                     }
@@ -3311,7 +3370,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                                   onClick={() => {
                                     const val = parseFloat(customDollarInputs[p.id] || '0');
                                     if (val > 0) {
-                                      handleAddByDollarAmount(p.id, val, p.name, p.price);
+                                      handleAddByDollarAmount(p.id, val, p.name, p.price, p.units_per_deal, p.deal_price);
                                       setCustomDollarInputs(prev => ({ ...prev, [p.id]: '' }));
                                     }
                                   }}
@@ -3534,12 +3593,107 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                   <input
                     type="number"
                     step="0.01"
-                    required
-                    placeholder="Ej. 1.25"
+                    placeholder="Ej. 0.35 (O deja vacío si usas oferta por dólares)"
                     value={prodPrice}
                     onChange={(e) => setProdPrice(e.target.value === '' ? '' : parseFloat(e.target.value))}
-                    className="w-full px-3 py-2 border border-amber-200/80 rounded-xl text-xs font-medium text-stone-900"
+                    className="w-full px-3 py-2 border border-amber-200/80 rounded-xl text-xs font-medium text-stone-900 bg-white"
                   />
+                </div>
+
+                {/* Especificar cantidad de producto por determinada cantidad de dinero */}
+                <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-black uppercase text-stone-900">
+                      🏷️ Promoción / Proporción por Dólar (Opcional)
+                    </label>
+                    <span className="text-[10px] text-amber-800 font-bold bg-amber-200/60 px-2 py-0.5 rounded-full">
+                      Ej: 3 por $1.00
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-stone-600 leading-tight">
+                    Especifica la cantidad de producto que el usuario recibirá por un determinado monto en dólares (ej. 3 pupusas por $1.00).
+                  </p>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] font-extrabold text-stone-700 mb-1">
+                        Cantidad de Productos
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="Ej. 3"
+                        value={prodUnitsPerDeal}
+                        onChange={(e) => {
+                          const val = e.target.value === '' ? '' : parseInt(e.target.value);
+                          setProdUnitsPerDeal(val);
+                          if (val && prodDealPrice) {
+                            const calculatedPrice = parseFloat((Number(prodDealPrice) / Number(val)).toFixed(4));
+                            if (!prodPrice || prodPrice === 0) {
+                              setProdPrice(calculatedPrice);
+                            }
+                          }
+                        }}
+                        className="w-full px-2.5 py-1.5 border border-amber-200 rounded-lg text-xs font-medium text-stone-900 bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-extrabold text-stone-700 mb-1">
+                        Monto en Dinero ($)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0.01"
+                        placeholder="Ej. 1.00"
+                        value={prodDealPrice}
+                        onChange={(e) => {
+                          const val = e.target.value === '' ? '' : parseFloat(e.target.value);
+                          setProdDealPrice(val);
+                          if (val && prodUnitsPerDeal) {
+                            const calculatedPrice = parseFloat((Number(val) / Number(prodUnitsPerDeal)).toFixed(4));
+                            if (!prodPrice || prodPrice === 0) {
+                              setProdPrice(calculatedPrice);
+                            }
+                          }
+                        }}
+                        className="w-full px-2.5 py-1.5 border border-amber-200 rounded-lg text-xs font-medium text-stone-900 bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-extrabold text-stone-700 mb-1">
+                      Descripción de la Oferta / Detalle
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ej. 3 pupusas por $1.00"
+                      value={prodDealNote}
+                      onChange={(e) => setProdDealNote(e.target.value)}
+                      className="w-full px-2.5 py-1.5 border border-amber-200 rounded-lg text-xs font-medium text-stone-900 bg-white"
+                    />
+                  </div>
+
+                  {prodUnitsPerDeal && prodDealPrice && (
+                    <div className="flex items-center justify-between text-[11px] bg-white p-2 rounded-lg border border-amber-200/70">
+                      <span className="font-bold text-emerald-800">
+                        ✨ Promoción: {prodUnitsPerDeal} unids por ${Number(prodDealPrice).toFixed(2)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const calculated = parseFloat((Number(prodDealPrice) / Number(prodUnitsPerDeal)).toFixed(4));
+                          setProdPrice(calculated);
+                          showToast(`💡 Precio unitario asignado a $${calculated.toFixed(2)}`);
+                        }}
+                        className="text-[10px] font-black bg-amber-500 hover:bg-amber-600 text-stone-950 px-2 py-0.5 rounded cursor-pointer"
+                      >
+                        Usar Precio Unitario (${(Number(prodDealPrice) / Number(prodUnitsPerDeal)).toFixed(2)})
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div>

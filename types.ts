@@ -202,6 +202,9 @@ export interface DomicilioProduct {
   disponible_domicilio: boolean;
   is_hidden: boolean;
   created_at: string;
+  units_per_deal?: number;
+  deal_price?: number;
+  deal_note?: string;
 }
 
 export interface DomicilioCustomerProfile {
