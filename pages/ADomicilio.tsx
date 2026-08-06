@@ -161,6 +161,17 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
   const mainSectionRef = useRef<HTMLDivElement>(null);
 
   const handleTabSelect = (tab: 'explore' | 'register_business' | 'manage_products' | 'view_orders' | 'customer_profile') => {
+    if (tab === 'register_business' && !customerProfile) {
+      showToast('⚠️ Para registrar un negocio, primero debes iniciar sesión o registrarte como cliente.');
+      setIsLoginDropdownOpen(true);
+      setActiveTab('customer_profile');
+      setTimeout(() => {
+        if (mainSectionRef.current) {
+          mainSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      }, 40);
+      return;
+    }
     setActiveTab(tab);
     setTimeout(() => {
       if (mainSectionRef.current) {
@@ -930,6 +941,13 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
   // Submit Business Registration Form (Requirement 1)
   const handleRegisterBusinessSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!customerProfile) {
+      showToast('⚠️ Para registrar un negocio, primero debes iniciar sesión o registrarte como cliente.');
+      setIsLoginDropdownOpen(true);
+      setActiveTab('customer_profile');
+      return;
+    }
 
     if (!bizOwnerName.trim() || !bizPhone.trim() || !bizName.trim()) {
       showToast('⚠️ Por favor completa los campos obligatorios del negocio');
@@ -1929,7 +1947,40 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
               </p>
             </div>
 
-            <form onSubmit={handleRegisterBusinessSubmit} className="space-y-5">
+            {!customerProfile ? (
+              <div className="bg-amber-50/90 border-2 border-amber-300 rounded-2xl p-6 sm:p-8 text-center space-y-4 my-2 shadow-xs">
+                <div className="w-12 h-12 bg-amber-100 text-amber-800 rounded-full flex items-center justify-center mx-auto border border-amber-300">
+                  <User className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg sm:text-xl font-black text-stone-900">
+                    Inicio de Sesión de Cliente Requerido
+                  </h3>
+                  <p className="text-xs sm:text-sm text-stone-600 max-w-md mx-auto mt-1 leading-relaxed">
+                    Para registrar y administrar tu negocio en la plataforma, primero debes iniciar sesión o registrarte como cliente.
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsLoginDropdownOpen(true)}
+                    className="w-full sm:w-auto px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-stone-950 font-extrabold text-xs sm:text-sm rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer border border-amber-600"
+                  >
+                    <User className="w-4 h-4" />
+                    1. Iniciar Sesión de Cliente
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleTabSelect('customer_profile')}
+                    className="w-full sm:w-auto px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-xs transition flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" />
+                    2. Ir al Formulario de Registro de Cliente
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleRegisterBusinessSubmit} className="space-y-5">
               {/* Propietario & Contacto */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -2170,6 +2221,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                 Completar Registro de Negocio
               </button>
             </form>
+            )}
           </div>
         )}
 
@@ -2186,7 +2238,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                   Para administrar tus productos, horarios y estado de delivery, debes registrar tu propio comercio primero.
                 </p>
                 <button
-                  onClick={() => setActiveTab('register_business')}
+                  onClick={() => handleTabSelect('register_business')}
                   className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs uppercase tracking-wider rounded-xl shadow-lg transition"
                 >
                   Registrar mi Negocio Ahora
