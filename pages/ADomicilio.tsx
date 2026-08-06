@@ -673,15 +673,24 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
 
         if (!custErr && dbCust && dbCust.length > 0) {
           setAllCustomerProfiles(dbCust);
-          const myDbProfile = dbCust.find((c: any) => c.user_id === user?.id);
+          const loadedCustStr = localStorage.getItem('domicilio_customer_profile');
+          const loadedCustObj = loadedCustStr ? JSON.parse(loadedCustStr) : null;
+          const myDbProfile = dbCust.find((c: any) => 
+            (user?.id && c.user_id === user.id) || 
+            (loadedCustObj && (c.id === loadedCustObj.id || (c.phone && loadedCustObj.phone && c.phone.replace(/\D/g, '') === loadedCustObj.phone.replace(/\D/g, ''))))
+          );
           if (myDbProfile) {
             setCustomerProfile(myDbProfile);
+            saveCustomerProfile(myDbProfile);
             setOrderAddressInput(myDbProfile.address);
             setCustLat(myDbProfile.latitude);
             setCustLng(myDbProfile.longitude);
             setCustAddress(myDbProfile.address);
             setCustName(myDbProfile.full_name);
             setCustPhone(myDbProfile.phone);
+            if (myDbProfile.latitude && myDbProfile.longitude) {
+              setCustGpsSuccess(true);
+            }
           }
         }
       } catch (err) {
@@ -690,6 +699,22 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
     };
     syncWithSupabaseOnMount();
   }, [user]);
+
+  useEffect(() => {
+    if (customerProfile) {
+      setCustName(customerProfile.full_name || '');
+      setCustPhone(customerProfile.phone || '');
+      setCustAddress(customerProfile.address || '');
+      if (customerProfile.latitude !== undefined && customerProfile.longitude !== undefined) {
+        setCustLat(customerProfile.latitude);
+        setCustLng(customerProfile.longitude);
+        setCustGpsSuccess(true);
+      }
+      if (customerProfile.address) {
+        setOrderAddressInput(customerProfile.address);
+      }
+    }
+  }, [customerProfile]);
 
   // Robust client-side UUID generator for database compliance
   const generateUUID = () => {
@@ -846,7 +871,8 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
     saveCustomerProfile(profile);
 
     setAllCustomerProfiles((prev) => {
-      const idx = prev.findIndex((p) => p.id === profile.id);
+      const clean = (p: string) => (p || '').replace(/\D/g, '');
+      const idx = prev.findIndex((p) => p.id === profile.id || (clean(p.phone) && clean(p.phone) === clean(profile.phone)));
       if (idx >= 0) {
         const copy = [...prev];
         copy[idx] = profile;
@@ -1198,22 +1224,26 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
       return false;
     }
 
-    const newProfile: DomicilioCustomerProfile = {
-      id: user?.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id)
+    const profileId = customerProfile?.id || (
+      user?.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id)
         ? user.id
-        : generateUUID(),
+        : generateUUID()
+    );
+
+    const newProfile: DomicilioCustomerProfile = {
+      id: profileId,
       full_name: custName.trim(),
       phone: custPhone.trim(),
       address: custAddress.trim(),
       latitude: custLat,
       longitude: custLng,
-      created_at: new Date().toISOString()
+      created_at: customerProfile?.created_at || new Date().toISOString()
     };
 
     updateCustomerProfileData(newProfile);
     setOrderAddressInput(newProfile.address);
     setIsCustomerModalOpen(false);
-    showToast('✅ Perfil de cliente guardado con ubicación GPS');
+    showToast(customerProfile ? '✅ Información de cliente actualizada con éxito' : '✅ Perfil de cliente guardado con ubicación GPS');
     return true;
   };
 
@@ -2991,6 +3021,15 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
               </p>
             </div>
 
+            {customerProfile && (
+              <div className="bg-amber-50 border border-amber-300/80 rounded-xl p-3 text-xs font-bold text-stone-800 flex items-center justify-between gap-2">
+                <span>Sesión activa: <strong className="text-stone-900">{customerProfile.full_name}</strong> ({customerProfile.phone})</span>
+                <span className="bg-amber-200 text-amber-900 text-[10px] font-black px-2 py-0.5 rounded-full uppercase shrink-0">
+                  Modo Edición
+                </span>
+              </div>
+            )}
+
             <form onSubmit={handleSaveCustomerProfileSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-extrabold uppercase tracking-wider text-stone-700 mb-1.5">
@@ -3067,9 +3106,9 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
 
               <button
                 type="submit"
-                className="w-full py-3.5 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black uppercase tracking-wider text-xs sm:text-sm rounded-xl shadow-md shadow-amber-500/20 transition"
+                className="w-full py-3.5 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black uppercase tracking-wider text-xs sm:text-sm rounded-xl shadow-md shadow-amber-500/20 transition cursor-pointer"
               >
-                Guardar Registro de Cliente
+                {customerProfile ? 'Actualizar Información de Cliente' : 'Guardar Registro de Cliente'}
               </button>
             </form>
           </div>
