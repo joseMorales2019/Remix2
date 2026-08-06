@@ -1365,7 +1365,8 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
         `*TOTAL:* $${newOrder.total.toFixed(2)}\n` +
         `${newOrder.additional_note ? `*Nota General:* ${newOrder.additional_note}\n` : ''}` +
         `---------------------------\n` +
-        `*Ubicación del Cliente:* https://www.google.com/maps?q=${newOrder.customer_latitude},${newOrder.customer_longitude}`;
+        `*Ubicación del Cliente:* https://www.google.com/maps?q=${newOrder.customer_latitude},${newOrder.customer_longitude}\n\n` +
+        `Este pedido se creó con ayuda de www.newbank.store`;
 
       // Limpiar el número de teléfono (solo dígitos)
       const cleanPhone = biz.phone.replace(/\D/g, '');
