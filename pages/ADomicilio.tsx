@@ -425,6 +425,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
   // Cart & Order Workflow States
   const [deliveryType, setDeliveryType] = useState<'personal' | 'domicilio'>('domicilio');
   const [cart, setCart] = useState<{ [productId: string]: number }>({});
+  const [itemNotes, setItemNotes] = useState<{ [productId: string]: string }>({});
   const [orderNote, setOrderNote] = useState('');
   const [orderAddressInput, setOrderAddressInput] = useState('');
   const [isOrderingModalOpen, setIsOrderingModalOpen] = useState(false);
@@ -1228,6 +1229,18 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
       }
       return { ...prev, [productId]: updated };
     });
+
+    if (delta < 0) {
+      setItemNotes((prev) => {
+        const currentQty = cart[productId] || 0;
+        if (currentQty + delta <= 0 && prev[productId]) {
+          const copy = { ...prev };
+          delete copy[productId];
+          return copy;
+        }
+        return prev;
+      });
+    }
   };
 
   const getCartItemsList = () => {
@@ -1239,13 +1252,16 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
         const prod = bizProds.find((p) => p.id === pId);
         if (!prod) return null;
         const qty = cart[pId];
+        if (!qty || qty <= 0) return null;
+        const note = itemNotes[pId]?.trim();
         return {
           product_id: prod.id,
           product_name: prod.name,
           unit_price: prod.price,
           quantity: qty,
           subtotal: prod.price * qty,
-          image_url: prod.image_url
+          image_url: prod.image_url,
+          item_note: note || undefined
         };
       })
       .filter(Boolean) as DomicilioOrderItem[];
@@ -1304,7 +1320,9 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
     
     // Enviar información del pedido al WhatsApp del dueño del negocio
     if (biz.phone) {
-      const itemsDetail = newOrder.items.map(item => `- ${item.quantity}x ${item.product_name} ($${item.unit_price.toFixed(2)} c/u) = $${item.subtotal.toFixed(2)}`).join('\n');
+      const itemsDetail = newOrder.items.map(item =>
+        `- ${item.quantity}x ${item.product_name} ($${item.unit_price.toFixed(2)} c/u) = $${item.subtotal.toFixed(2)}${item.item_note ? ` [Nota: ${item.item_note}]` : ''}`
+      ).join('\n');
       
       const whatsappMsg = `*NUEVO PEDIDO - NewBank AI*\n` +
         `---------------------------\n` +
@@ -1315,7 +1333,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
         `*Fecha:* ${newOrder.order_date} ${newOrder.order_time}\n\n` +
         `*DETALLE:*\n${itemsDetail}\n\n` +
         `*TOTAL:* $${newOrder.total.toFixed(2)}\n` +
-        `${newOrder.additional_note ? `*Nota:* ${newOrder.additional_note}\n` : ''}` +
+        `${newOrder.additional_note ? `*Nota General:* ${newOrder.additional_note}\n` : ''}` +
         `---------------------------\n` +
         `*Ubicación del Cliente:* https://www.google.com/maps?q=${newOrder.customer_latitude},${newOrder.customer_longitude}`;
 
@@ -1331,6 +1349,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
     showToast(`🔔 ¡Pedido realizado! Notificación Push emitida a ${biz.business_name}`);
     setOrderSuccessOrder(newOrder);
     setCart({});
+    setItemNotes({});
     setOrderNote('');
     setIsOrderingModalOpen(false);
     setOrderingBusiness(null);
@@ -2691,9 +2710,16 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                                         Productos Solicitados:
                                       </p>
                                       {ord.items.map((it, idx) => (
-                                        <div key={idx} className="flex justify-between font-bold text-stone-900 text-xs">
-                                          <span>{it.quantity}x {it.product_name}</span>
-                                          <span className="text-red-700">${(it.subtotal || it.unit_price * it.quantity).toFixed(2)}</span>
+                                        <div key={idx} className="space-y-0.5 border-b border-stone-100 last:border-0 pb-1 last:pb-0">
+                                          <div className="flex justify-between font-bold text-stone-900 text-xs">
+                                            <span>{it.quantity}x {it.product_name}</span>
+                                            <span className="text-red-700">${(it.subtotal || it.unit_price * it.quantity).toFixed(2)}</span>
+                                          </div>
+                                          {it.item_note && (
+                                            <p className="text-[10px] text-amber-900 bg-amber-50/80 px-1.5 py-0.5 rounded border border-amber-200/50 italic">
+                                              📝 Nota: {it.item_note}
+                                            </p>
+                                          )}
                                         </div>
                                       ))}
                                       <div className="pt-1.5 border-t border-stone-100 flex justify-between font-black text-xs text-stone-950">
@@ -2911,7 +2937,14 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                               <tbody className="divide-y divide-amber-100">
                                 {ord.items.map((item, idx) => (
                                   <tr key={idx}>
-                                    <td className="p-2 font-bold text-stone-900">{item.product_name}</td>
+                                    <td className="p-2 font-bold text-stone-900">
+                                      <div>{item.product_name}</div>
+                                      {item.item_note && (
+                                        <div className="text-[10px] text-amber-900 font-medium italic mt-0.5 bg-amber-50 p-1 rounded border border-amber-200/60">
+                                          📝 Nota: {item.item_note}
+                                        </div>
+                                      )}
+                                    </td>
                                     <td className="p-2 font-semibold text-stone-700">{item.quantity}</td>
                                     <td className="p-2">${item.unit_price.toFixed(2)}</td>
                                     <td className="p-2 text-right font-black text-red-700">${item.subtotal.toFixed(2)}</td>
@@ -3123,42 +3156,58 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                       return (
                         <div
                           key={p.id}
-                          className="flex items-center justify-between bg-white p-2 sm:p-2.5 rounded-xl border border-amber-200/80"
+                          className="bg-white p-2.5 rounded-xl border border-amber-200/80 space-y-2"
                         >
-                          <div className="flex items-center gap-2.5">
-                            <img
-                              src={p.image_url}
-                              alt={p.name}
-                              onClick={() => setSelectedImageForView(p.image_url)}
-                              className="w-11 h-11 sm:w-12 sm:h-12 rounded-lg object-cover border border-amber-200 cursor-zoom-in"
-                            />
-                            <div>
-                              <p 
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                              <img
+                                src={p.image_url}
+                                alt={p.name}
                                 onClick={() => setSelectedImageForView(p.image_url)}
-                                className="font-extrabold text-xs text-stone-900 cursor-pointer hover:text-amber-700 transition-colors"
+                                className="w-11 h-11 sm:w-12 sm:h-12 rounded-lg object-cover border border-amber-200 cursor-zoom-in"
+                              />
+                              <div>
+                                <p 
+                                  onClick={() => setSelectedImageForView(p.image_url)}
+                                  className="font-extrabold text-xs text-stone-900 cursor-pointer hover:text-amber-700 transition-colors"
+                                >
+                                  {p.name}
+                                </p>
+                                <p className="text-red-700 font-black text-xs">${p.price.toFixed(2)}</p>
+                              </div>
+                            </div>
+
+                            {/* Quantity selector */}
+                            <div className="flex items-center gap-1.5 bg-stone-100 p-1 rounded-lg">
+                              <button
+                                onClick={() => handleQuantityChange(p.id, -1)}
+                                className="w-6 h-6 bg-white border border-stone-300 text-stone-800 font-black rounded flex items-center justify-center text-xs"
                               >
-                                {p.name}
-                              </p>
-                              <p className="text-red-700 font-black text-xs">${p.price.toFixed(2)}</p>
+                                -
+                              </button>
+                              <span className="w-6 text-center text-xs font-black text-stone-900">{qty}</span>
+                              <button
+                                onClick={() => handleQuantityChange(p.id, 1)}
+                                className="w-6 h-6 bg-amber-500 text-stone-950 font-black rounded flex items-center justify-center text-xs"
+                              >
+                                +
+                              </button>
                             </div>
                           </div>
 
-                          {/* Quantity selector */}
-                          <div className="flex items-center gap-1.5 bg-stone-100 p-1 rounded-lg">
-                            <button
-                              onClick={() => handleQuantityChange(p.id, -1)}
-                              className="w-6 h-6 bg-white border border-stone-300 text-stone-800 font-black rounded flex items-center justify-center text-xs"
-                            >
-                              -
-                            </button>
-                            <span className="w-6 text-center text-xs font-black text-stone-900">{qty}</span>
-                            <button
-                              onClick={() => handleQuantityChange(p.id, 1)}
-                              className="w-6 h-6 bg-amber-500 text-stone-950 font-black rounded flex items-center justify-center text-xs"
-                            >
-                              +
-                            </button>
-                          </div>
+                          {/* Nota opcional por producto */}
+                          {qty > 0 && (
+                            <div className="pt-2 border-t border-amber-100/80 flex items-center gap-1.5">
+                              <span className="text-stone-400 text-xs shrink-0">📝</span>
+                              <input
+                                type="text"
+                                placeholder={`Nota para ${p.name} (ej. sin cebolla, salsa aparte)...`}
+                                value={itemNotes[p.id] || ''}
+                                onChange={(e) => setItemNotes(prev => ({ ...prev, [p.id]: e.target.value }))}
+                                className="w-full px-2.5 py-1 border border-amber-200/90 rounded-lg text-[11px] font-medium text-stone-900 bg-amber-50/20 focus:outline-hidden focus:ring-1 focus:ring-amber-500 placeholder:text-stone-400"
+                              />
+                            </div>
+                          )}
                         </div>
                       );
                     })}
@@ -3204,6 +3253,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                   <button
                     onClick={() => {
                       setCart({});
+                      setItemNotes({});
                       showToast('🧹 Selección limpiada. Puedes agregar otros productos.');
                     }}
                     className="px-3.5 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs font-extrabold uppercase rounded-xl transition"
@@ -3506,6 +3556,11 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                       <div className="min-w-0">
                         <p className="font-bold text-stone-900 truncate">{item.product_name}</p>
                         <p className="text-[9px] text-stone-500">{item.quantity} x ${item.unit_price.toFixed(2)}</p>
+                        {item.item_note && (
+                          <p className="text-[9px] text-amber-900 italic bg-amber-100/50 px-1 py-0.5 rounded border border-amber-200/50 mt-0.5">
+                            📝 Nota: {item.item_note}
+                          </p>
+                        )}
                       </div>
                       <span className="font-black text-stone-900 self-center">${item.subtotal.toFixed(2)}</span>
                     </div>

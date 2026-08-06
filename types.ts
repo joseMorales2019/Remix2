@@ -221,6 +221,7 @@ export interface DomicilioOrderItem {
   quantity: number;
   subtotal: number;
   image_url?: string;
+  item_note?: string;
 }
 
 export interface DomicilioOrder {
