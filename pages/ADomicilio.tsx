@@ -464,6 +464,16 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
   const [bizGpsLoading, setBizGpsLoading] = useState(false);
   const [bizGpsSuccess, setBizGpsSuccess] = useState(false);
 
+  useEffect(() => {
+    if (customerProfile) {
+      if (!bizOwnerName) setBizOwnerName(customerProfile.full_name || '');
+      if (!bizPhone) setBizPhone(customerProfile.phone || '');
+    } else if (user) {
+      if (!bizOwnerName) setBizOwnerName(user.full_name || '');
+      if (!bizPhone) setBizPhone(user.phone || '');
+    }
+  }, [customerProfile, user]);
+
   // Product Form State (New or Edit)
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
@@ -704,9 +714,10 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
 
     for (const b of newList) {
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(b.id);
-      if (isUUID || b.user_id) {
+      if (isUUID) {
         try {
           const payload: any = {
+            id: b.id,
             owner_name: b.owner_name,
             phone: b.phone,
             business_name: b.business_name,
@@ -717,14 +728,45 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
             address_text: b.address_text,
             delivery_paused: b.delivery_paused || false,
             manual_closed: b.manual_closed || false,
-            user_id: b.user_id || null
+            created_at: b.created_at || new Date().toISOString()
           };
-          if (isUUID) {
-            payload.id = b.id;
+
+          if (b.user_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(b.user_id)) {
+            payload.user_id = b.user_id;
           }
-          await supabase.from('domicilio_businesses').upsert(payload);
+
+          let { error } = await supabase.from('domicilio_businesses').upsert(payload);
+
+          if (error && payload.user_id) {
+            delete payload.user_id;
+            const res = await supabase.from('domicilio_businesses').upsert(payload);
+            error = res.error;
+          }
+
+          if (error) {
+            if (Array.isArray(payload.schedules)) {
+              payload.schedules = JSON.stringify(payload.schedules);
+            }
+            const res2 = await supabase.from('domicilio_businesses').upsert(payload);
+            if (res2.error) {
+              const minimalPayload = {
+                id: b.id,
+                owner_name: b.owner_name,
+                phone: b.phone,
+                business_name: b.business_name,
+                is_24_7: b.is_24_7,
+                latitude: b.latitude,
+                longitude: b.longitude,
+                address_text: b.address_text
+              };
+              const minRes = await supabase.from('domicilio_businesses').upsert(minimalPayload);
+              if (minRes.error) {
+                console.warn("Supabase business sync note:", minRes.error.message || minRes.error);
+              }
+            }
+          }
         } catch (err) {
-          console.error("Error upserting business to Supabase:", err);
+          console.warn("Supabase business sync catch note:", err);
         }
       }
     }
@@ -738,9 +780,10 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p.id);
       const isBizUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(p.business_id);
       
-      if (isBizUUID) {
+      if (isUUID && isBizUUID) {
         try {
           const payload: any = {
+            id: p.id,
             business_id: p.business_id,
             name: p.name,
             price: p.price,
@@ -748,12 +791,12 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
             disponible_domicilio: p.disponible_domicilio,
             is_hidden: p.is_hidden || false,
           };
-          if (isUUID) {
-            payload.id = p.id;
+          const { error } = await supabase.from('domicilio_products').upsert(payload);
+          if (error) {
+            console.warn("Supabase product sync note:", error.message || error);
           }
-          await supabase.from('domicilio_products').upsert(payload);
         } catch (err) {
-          console.error("Error upserting product to Supabase:", err);
+          console.warn("Supabase product sync catch note:", err);
         }
       }
     }
@@ -767,9 +810,10 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
       const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(o.id);
       const isBizUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(o.business_id);
       
-      if (isBizUUID) {
+      if (isUUID && isBizUUID) {
         try {
           const payload: any = {
+            id: o.id,
             business_id: o.business_id,
             business_name: o.business_name,
             customer_name: o.customer_name,
@@ -785,12 +829,12 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
             additional_note: o.additional_note || null,
             status: o.status || 'Pendiente'
           };
-          if (isUUID) {
-            payload.id = o.id;
+          const { error } = await supabase.from('domicilio_orders').upsert(payload);
+          if (error) {
+            console.warn("Supabase order sync note:", error.message || error);
           }
-          await supabase.from('domicilio_orders').upsert(payload);
         } catch (err) {
-          console.error("Error upserting order to Supabase:", err);
+          console.warn("Supabase order sync catch note:", err);
         }
       }
     }
@@ -812,21 +856,31 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
     });
 
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(profile.id);
-    try {
-      const payload: any = {
-        user_id: user?.id || null,
-        full_name: profile.full_name,
-        phone: profile.phone,
-        address: profile.address,
-        latitude: profile.latitude,
-        longitude: profile.longitude
-      };
-      if (isUUID) {
-        payload.id = profile.id;
+    if (isUUID) {
+      try {
+        const payload: any = {
+          id: profile.id,
+          full_name: profile.full_name,
+          phone: profile.phone,
+          address: profile.address,
+          latitude: profile.latitude,
+          longitude: profile.longitude
+        };
+        if (user?.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id)) {
+          payload.user_id = user.id;
+        }
+        let { error } = await supabase.from('domicilio_customer_profiles').upsert(payload);
+        if (error && payload.user_id) {
+          delete payload.user_id;
+          const res = await supabase.from('domicilio_customer_profiles').upsert(payload);
+          error = res.error;
+        }
+        if (error) {
+          console.warn("Supabase customer profile sync note:", error.message || error);
+        }
+      } catch (err) {
+        console.warn("Supabase customer profile sync catch note:", err);
       }
-      await supabase.from('domicilio_customer_profiles').upsert(payload);
-    } catch (err) {
-      console.error("Error upserting customer profile to Supabase:", err);
     }
   };
 
@@ -939,7 +993,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
   };
 
   // Submit Business Registration Form (Requirement 1)
-  const handleRegisterBusinessSubmit = (e: React.FormEvent) => {
+  const handleRegisterBusinessSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!customerProfile) {
@@ -949,7 +1003,11 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
       return;
     }
 
-    if (!bizOwnerName.trim() || !bizPhone.trim() || !bizName.trim()) {
+    const finalOwnerName = bizOwnerName.trim() || customerProfile.full_name || '';
+    const finalPhone = bizPhone.trim() || customerProfile.phone || '';
+    const finalBizName = bizName.trim();
+
+    if (!finalOwnerName || !finalPhone || !finalBizName) {
       showToast('⚠️ Por favor completa los campos obligatorios del negocio');
       return;
     }
@@ -959,22 +1017,28 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
       return;
     }
 
+    const validUserId = (user?.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id))
+      ? user.id
+      : (customerProfile?.id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(customerProfile.id))
+      ? customerProfile.id
+      : null;
+
     const newBiz: DomicilioBusiness = {
       id: generateUUID(),
-      owner_name: bizOwnerName.trim(),
-      phone: bizPhone.trim(),
-      business_name: bizName.trim(),
+      owner_name: finalOwnerName,
+      phone: finalPhone,
+      business_name: finalBizName,
       is_24_7: bizIs247,
       schedules: bizIs247 ? [] : bizSchedules,
       latitude: bizLat,
       longitude: bizLng,
-      address_text: bizAddressText.trim() || 'El Salvador',
+      address_text: bizAddressText.trim() || customerProfile.address || 'El Salvador',
       created_at: new Date().toISOString(),
-      user_id: user?.id || customerProfile?.id || null
+      user_id: validUserId
     };
 
     const updated = [newBiz, ...businesses];
-    updateBusinesses(updated);
+    await updateBusinesses(updated);
     setSelectedBusiness(newBiz);
     setManagingBusinessId(newBiz.id);
 
