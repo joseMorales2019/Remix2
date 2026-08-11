@@ -70,6 +70,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
     'explore' | 'register_business' | 'manage_products' | 'view_orders' | 'customer_profile'
   >('explore');
   const [hasProcessedDeepLink, setHasProcessedDeepLink] = useState(false);
+  const [dismissedBusinessId, setDismissedBusinessId] = useState<string | null>(null);
 
   // Core Data States
   const [businesses, setBusinesses] = useState<DomicilioBusiness[]>([]);
@@ -418,6 +419,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
       const bizId = params.get('businessId');
 
       if (bizId) {
+        if (dismissedBusinessId === bizId) return;
         const found = businesses.find(b => b.id === bizId);
         if (found) {
           // Avoid repeated processing if it's already selected and we are in the right tab
@@ -443,7 +445,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
     // Listen for hash changes to allow deep-linking without page reload
     window.addEventListener('hashchange', handleDeepLink);
     return () => window.removeEventListener('hashchange', handleDeepLink);
-  }, [businesses, hasProcessedDeepLink, selectedBusiness?.id, activeTab]);
+  }, [businesses, hasProcessedDeepLink, selectedBusiness?.id, activeTab, dismissedBusinessId]);
 
   useEffect(() => {
     return () => {
@@ -2057,7 +2059,16 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                           </p>
                         </div>
                         <button
-                          onClick={() => setSelectedBusiness(null)}
+                          onClick={() => {
+                            if (b) setDismissedBusinessId(b.id);
+                            setSelectedBusiness(null);
+                            const url = new URL(window.location.href);
+                            url.searchParams.delete('businessId');
+                            if (url.hash.includes('businessId')) {
+                              url.hash = url.hash.replace(/([?&])businessId=[^&]*&?/, '$1').replace(/[?&]$/, '');
+                            }
+                            window.history.replaceState({}, '', url.toString());
+                          }}
                           className="text-stone-400 hover:text-stone-700 p-1 rounded-lg shrink-0"
                           title="Cerrar tarjeta"
                         >
