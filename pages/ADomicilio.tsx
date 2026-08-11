@@ -153,6 +153,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
   const [posterTheme, setPosterTheme] = useState<'modern' | 'vibrant' | 'minimal' | 'delivery'>('modern');
   const [aiPosterHeadline, setAiPosterHeadline] = useState('');
   const [aiPosterSubtext, setAiPosterSubtext] = useState('');
+  const [aiPosterImageUrl, setAiPosterImageUrl] = useState('');
   const [isGeneratingPosterAi, setIsGeneratingPosterAi] = useState(false);
 
   const handleGenerateAiSlogan = async () => {
@@ -164,7 +165,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: `Crea un eslogan publicitario corto, sumamente llamativo y profesional para un negocio llamado "${managingBiz.business_name}" (${managingBiz.category}) que vende: ${visibleProds.map(p => p.name).join(', ')}. Devuelve únicamente un texto con el formato JSON: {"headline": "...", "subtext": "..."}. Sin markdown adicional.`,
+          message: `Crea un eslogan publicitario corto, sumamente llamativo y profesional, y una descripción detallada en inglés (image_prompt) para generar una imagen publicitaria profesional con IA que represente perfectamente un negocio llamado "${managingBiz.business_name}" (${managingBiz.category}) que vende: ${visibleProds.map(p => p.name).join(', ')}. Devuelve únicamente un texto con el formato JSON: {"headline": "...", "subtext": "...", "image_prompt": "..."}. Sin markdown adicional.`,
           history: [],
           detectedUser: customerProfile || user,
           products: visibleProds
@@ -176,6 +177,9 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
           const parsed = JSON.parse(data.reply);
           if (parsed.headline) setAiPosterHeadline(parsed.headline);
           if (parsed.subtext) setAiPosterSubtext(parsed.subtext);
+          if (parsed.image_prompt) {
+            setAiPosterImageUrl(`https://image.pollinations.ai/prompt/${encodeURIComponent(parsed.image_prompt)}?width=1200&height=800&nologo=true`);
+          }
         } catch {
           setAiPosterHeadline(data.reply.slice(0, 100));
         }
@@ -2747,31 +2751,18 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                         const bizProds = products.filter((p) => p.business_id === managingBiz.id);
                         const allHidden = bizProds.length > 0 && bizProds.every((p) => p.is_hidden);
                         return (
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              onClick={() => handleToggleAllProductsVisibility(managingBiz.id, !allHidden)}
-                              className={`p-1 rounded-lg transition-colors flex items-center gap-1 px-2 py-1 ${
-                                allHidden 
-                                  ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' 
-                                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                              }`}
-                              title={allHidden ? 'Mostrar todos los productos' : 'Ocultar todos los productos'}
-                            >
-                              {allHidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                              <span className="text-[10px] font-bold uppercase">{allHidden ? 'Mostrar Todos' : 'Ocultar Todos'}</span>
-                            </button>
-                            <button
-                              onClick={() => {
-                                setAiPosterHeadline(`¡Descubre lo mejor de ${managingBiz.business_name}! Calidad y entrega a domicilio.`);
-                                setAiPosterSubtext('¡Haz tu pedido en línea de forma rápida y segura!');
-                                setIsPosterModalOpen(true);
-                              }}
-                              className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow-sm transition cursor-pointer"
-                              title="Crear afiche publicitario profesional con los productos visibles usando IA"
-                            >
-                              <Sparkles className="w-3.5 h-3.5 text-amber-200" /> Afiche IA
-                            </button>
-                          </div>
+                          <button
+                            onClick={() => handleToggleAllProductsVisibility(managingBiz.id, !allHidden)}
+                            className={`p-1 rounded-lg transition-colors flex items-center gap-1 px-2 py-1 ${
+                              allHidden 
+                                ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' 
+                                : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                            }`}
+                            title={allHidden ? 'Mostrar todos los productos' : 'Ocultar todos los productos'}
+                          >
+                            {allHidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                            <span className="text-[10px] font-bold uppercase">{allHidden ? 'Mostrar Todos' : 'Ocultar Todos'}</span>
+                          </button>
                         );
                       })()}
                     </div>
@@ -4268,6 +4259,22 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                       </div>
                     </div>
                   </div>
+
+                  {/* AI Generated Promotional Image Banner */}
+                  {aiPosterImageUrl && (
+                    <div className="relative z-10 my-3 rounded-2xl overflow-hidden shadow-xl h-32 sm:h-40 border-2 border-white/20">
+                      <img
+                        src={aiPosterImageUrl}
+                        alt="Afiche IA Promocional"
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-950/20 to-transparent flex items-end p-2.5">
+                        <span className="text-[10px] font-black tracking-widest text-amber-300 uppercase bg-stone-950/80 px-2 py-0.5 rounded-lg backdrop-blur-xs border border-white/20 flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-amber-400" /> Imagen Comercial Generada con IA
+                        </span>
+                      </div>
+                    </div>
+                  )}
 
                   {/* AI Headline & Subtext */}
                   <div className="relative z-10 my-6 text-center space-y-2">

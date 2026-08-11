@@ -563,6 +563,10 @@ Mantén tus respuestas sumamente cortas, de máximo 2 o 3 frases. Ve al grano, n
         console.warn("Gemini API Rate Limit in /api/chat. Falling back to local responses if possible.");
         return res.status(429).json({ error: "Rate limit exceeded" });
       }
+      if (error.status === 403 || error?.error?.code === 403 || error.message?.includes('403') || error.message?.includes('leaked') || error.message?.includes('PERMISSION_DENIED')) {
+        console.warn("Gemini API Key issue (403/Leaked) in /api/chat. Falling back to smart default response.");
+        return res.json({ reply: "¡Hola! Bienvenido a NewBank Store y A Domicilio en El Salvador. ¿En qué podemos servirte hoy? Contamos con microcréditos rápidos y la mejor variedad de productos." });
+      }
       console.error("Gemini API Error in /api/chat:", error);
       return res.status(500).json({ error: error.message || "Error generating response" });
     }
@@ -612,6 +616,10 @@ Mantén tus respuestas sumamente cortas, de máximo 2 o 3 frases. Ve al grano, n
       if (error.status === 429 || error?.error?.code === 429 || error.message?.includes('429')) {
         console.warn("Gemini API Rate Limit in /api/tts. Falling back to native synth.");
         return res.status(429).json({ error: "Rate limit exceeded" });
+      }
+      if (error.status === 403 || error?.error?.code === 403 || error.message?.includes('403') || error.message?.includes('leaked') || error.message?.includes('PERMISSION_DENIED')) {
+        console.warn("Gemini API Key issue (403/Leaked) in /api/tts.");
+        return res.status(503).json({ error: "API key requires update" });
       }
       console.error("Gemini API Error in /api/tts:", error);
       return res.status(500).json({ error: error.message || "Error generating speech synthesis" });

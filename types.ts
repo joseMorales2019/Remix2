@@ -190,6 +190,8 @@ export interface DomicilioBusiness {
   address_text?: string;
   delivery_paused?: boolean;
   manual_closed?: boolean;
+  category?: string;
+  avatar_url?: string;
   created_at: string;
 }
 
