@@ -413,53 +413,36 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
     const handleDeepLink = () => {
       if (businesses.length === 0) return;
 
-      const getParam = (name: string) => {
-        const searchParams = new URLSearchParams(window.location.search);
-        if (searchParams.has(name)) return searchParams.get(name);
-        
-        const hash = window.location.hash;
-        if (hash.includes('?')) {
-          const hashParams = new URLSearchParams(hash.split('?')[1]);
-          return hashParams.get(name);
-        }
-        return null;
-      };
-
-      const bizId = getParam('businessId');
+      const search = window.location.search || (window.location.hash.includes('?') ? window.location.hash.split('?')[1] : '');
+      const params = new URLSearchParams(search);
+      const bizId = params.get('businessId');
 
       if (bizId) {
         const found = businesses.find(b => b.id === bizId);
         if (found) {
-          // If already selected and in tab, only return if we already processed it for this specific ID
+          // Avoid repeated processing if it's already selected and we are in the right tab
           if (selectedBusiness?.id === found.id && activeTab === 'explore' && hasProcessedDeepLink) return;
 
-          handleTabSelect('explore');
+          setActiveTab('explore');
           setSelectedBusiness(found);
           setHasProcessedDeepLink(true);
           
-          // Smooth scroll to the map container
+          // Smooth scroll to the map view if not already there
           setTimeout(() => {
-            const mapSection = document.getElementById('mapa-visualizacion');
+            const mapSection = document.getElementById('seccion-anclada');
             if (mapSection) {
-              mapSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            } else {
-              // Fallback to the anchored section
-              const fallback = document.getElementById('seccion-anclada');
-              if (fallback) fallback.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              mapSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
-          }, 1000);
+          }, 800);
         }
       }
     };
 
     handleDeepLink();
     
+    // Listen for hash changes to allow deep-linking without page reload
     window.addEventListener('hashchange', handleDeepLink);
-    window.addEventListener('popstate', handleDeepLink);
-    return () => {
-      window.removeEventListener('hashchange', handleDeepLink);
-      window.removeEventListener('popstate', handleDeepLink);
-    };
+    return () => window.removeEventListener('hashchange', handleDeepLink);
   }, [businesses, hasProcessedDeepLink, selectedBusiness?.id, activeTab]);
 
   useEffect(() => {
@@ -644,9 +627,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
     setAllCustomerProfiles(loadedCust ? [loadedCust] : []);
 
     if (loadedBiz.length > 0) {
-      const searchParams = new URLSearchParams(window.location.search);
-      const bizIdInUrl = searchParams.get('businessId') || (window.location.hash.includes('?') ? new URLSearchParams(window.location.hash.split('?')[1]).get('businessId') : null);
-      
+      const bizIdInUrl = new URLSearchParams(window.location.search || (window.location.hash.includes('?') ? window.location.hash.split('?')[1] : '')).get('businessId');
       if (!bizIdInUrl) {
         setSelectedBusiness(loadedBiz[0]);
       }
@@ -685,8 +666,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
           });
           setBusinesses(mergedBiz);
           if (mergedBiz.length > 0) {
-            const searchParams = new URLSearchParams(window.location.search);
-            const bizIdInUrl = searchParams.get('businessId') || (window.location.hash.includes('?') ? new URLSearchParams(window.location.hash.split('?')[1]).get('businessId') : null);
+            const bizIdInUrl = new URLSearchParams(window.location.search || (window.location.hash.includes('?') ? window.location.hash.split('?')[1] : '')).get('businessId');
             const hasTargetInList = bizIdInUrl && mergedBiz.some(b => b.id === bizIdInUrl);
             
             if (!hasTargetInList && !selectedBusiness) {
@@ -2014,7 +1994,6 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
 
             {/* Amplified Interactive Map Canvas Visualization (Requirement 5) */}
             <div
-              id="mapa-visualizacion"
               className="bg-stone-900 rounded-2xl text-white shadow-xl border border-stone-800 overflow-hidden relative flex-grow min-h-[500px] sm:min-h-[600px] mb-4"
               style={{
                 borderStyle: 'dashed',
@@ -2714,23 +2693,19 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                       </h3>
                       {(() => {
                         const bizProds = products.filter((p) => p.business_id === managingBiz.id);
-                        const anyVisible = bizProds.some((p) => !p.is_hidden);
-                        // If any is visible, the toggle should "Hide All". 
-                        // If all are hidden (or no products), the toggle should "Show All".
-                        const allHidden = !anyVisible; 
-                        
+                        const allHidden = bizProds.length > 0 && bizProds.every((p) => p.is_hidden);
                         return (
                           <button
                             onClick={() => handleToggleAllProductsVisibility(managingBiz.id, !allHidden)}
-                            className={`p-1 rounded-lg transition-all flex items-center gap-1.5 px-2.5 py-1.5 ${
+                            className={`p-1 rounded-lg transition-colors flex items-center gap-1 px-2 py-1 ${
                               allHidden 
-                                ? 'bg-amber-100 text-amber-700 hover:bg-amber-200 ring-1 ring-amber-300' 
-                                : 'bg-stone-100 text-stone-600 hover:bg-stone-200 ring-1 ring-stone-300'
+                                ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' 
+                                : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
                             }`}
                             title={allHidden ? 'Mostrar todos los productos' : 'Ocultar todos los productos'}
                           >
-                            {allHidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                            <span className="text-[10px] font-black uppercase tracking-wider">{allHidden ? 'Mostrar Todo' : 'Ocultar Todo'}</span>
+                            {allHidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                            <span className="text-[10px] font-bold uppercase">{allHidden ? 'Mostrar Todos' : 'Ocultar Todos'}</span>
                           </button>
                         );
                       })()}
