@@ -75,27 +75,43 @@ const CommunityScoreIndicator: React.FC = () => {
 const SmartSlideMenu: React.FC<{ user: any; onSignOut: () => void }> = ({ user, onSignOut }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isStandalone, setIsStandalone] = useState(false);
+  const [showInstallModal, setShowInstallModal] = useState(false);
   const location = useLocation();
 
   useEffect(() => {
+    const checkStandalone = window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone === true;
+    setIsStandalone(checkStandalone);
+
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
     };
 
+    const handleAppInstalled = () => {
+      setIsStandalone(true);
+      setDeferredPrompt(null);
+    };
+
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
     };
   }, []);
 
   const handleInstallClick = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    if (outcome === 'accepted') {
-      setDeferredPrompt(null);
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setDeferredPrompt(null);
+        setIsStandalone(true);
+      }
+    } else {
+      setShowInstallModal(true);
     }
   };
 
@@ -191,12 +207,13 @@ const SmartSlideMenu: React.FC<{ user: any; onSignOut: () => void }> = ({ user, 
               </Link>
             ))}
             
-            {deferredPrompt && (
+            {!isStandalone && (
               <button 
                 onClick={handleInstallClick}
-                className="bg-blue-50 text-blue-600 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-100 transition shadow-sm border border-blue-100"
+                className="bg-blue-600 text-white px-3.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition shadow-sm border border-blue-600 flex items-center gap-1.5 cursor-pointer ml-2"
+                title="Instalar App en tu dispositivo"
               >
-                Instalar App
+                <span>📲</span> Instalar App
               </button>
             )}
             
@@ -240,18 +257,29 @@ const SmartSlideMenu: React.FC<{ user: any; onSignOut: () => void }> = ({ user, 
             )}
           </div>
 
-          <button 
-            onClick={() => setIsOpen(true)}
-            className="p-2 hover:bg-slate-100 rounded-xl transition-colors group flex items-center gap-2"
-            aria-label="Abrir menú"
-          >
-            <span className="hidden md:block text-[10px] font-black uppercase text-slate-400 tracking-widest group-hover:text-blue-600 transition-colors">Menú</span>
-            <div className="space-y-1.5">
-              <div className="w-6 h-0.5 bg-slate-600 group-hover:bg-blue-600 transition-all"></div>
-              <div className="w-4 h-0.5 bg-slate-600 group-hover:bg-blue-600 transition-all ml-auto"></div>
-              <div className="w-6 h-0.5 bg-slate-600 group-hover:bg-blue-600 transition-all"></div>
-            </div>
-          </button>
+          <div className="flex items-center gap-2">
+            {!isStandalone && (
+              <button 
+                onClick={handleInstallClick}
+                className="md:hidden bg-blue-600 text-white px-2.5 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-blue-700 transition shadow-sm flex items-center gap-1 cursor-pointer"
+                title="Instalar App"
+              >
+                <span>📲</span> App
+              </button>
+            )}
+            <button 
+              onClick={() => setIsOpen(true)}
+              className="p-2 hover:bg-slate-100 rounded-xl transition-colors group flex items-center gap-2"
+              aria-label="Abrir menú"
+            >
+              <span className="hidden md:block text-[10px] font-black uppercase text-slate-400 tracking-widest group-hover:text-blue-600 transition-colors">Menú</span>
+              <div className="space-y-1.5">
+                <div className="w-6 h-0.5 bg-slate-600 group-hover:bg-blue-600 transition-all"></div>
+                <div className="w-4 h-0.5 bg-slate-600 group-hover:bg-blue-600 transition-all ml-auto"></div>
+                <div className="w-6 h-0.5 bg-slate-600 group-hover:bg-blue-600 transition-all"></div>
+              </div>
+            </button>
+          </div>
         </div>
       </nav>
 
@@ -335,12 +363,12 @@ const SmartSlideMenu: React.FC<{ user: any; onSignOut: () => void }> = ({ user, 
         </div>
 
         <div className="p-6 border-t border-slate-100 bg-slate-50/50 space-y-3">
-          {deferredPrompt && (
+          {!isStandalone && (
             <button 
               onClick={handleInstallClick}
-              className="w-full bg-blue-50 text-blue-600 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-100 transition shadow-sm border border-blue-100 flex items-center justify-center gap-2"
+              className="w-full bg-blue-50 text-blue-600 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-100 transition shadow-sm border border-blue-200 flex items-center justify-center gap-2 cursor-pointer"
             >
-              <span>📲</span> Instalar Aplicación
+              <span>📲</span> Instalar / Descargar App
             </button>
           )}
 
@@ -381,6 +409,53 @@ const SmartSlideMenu: React.FC<{ user: any; onSignOut: () => void }> = ({ user, 
           )}
         </div>
       </aside>
+
+      {showInstallModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-md animate-fade-in">
+          <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-blue-100 text-center relative">
+            <button 
+              onClick={() => setShowInstallModal(false)}
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-900 text-xl font-bold cursor-pointer"
+            >
+              ✕
+            </button>
+
+            <div className="w-16 h-16 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-blue-200">
+              <span className="text-white font-black text-2xl">N</span>
+            </div>
+
+            <h3 className="font-black text-slate-900 text-lg uppercase tracking-tight mb-2">Instalar NewBank App</h3>
+            <p className="text-xs text-slate-500 font-medium mb-5 leading-relaxed">
+              Descarga la aplicación en tu pantalla de inicio para un acceso directo, más rápido y sin barra de navegador.
+            </p>
+
+            <div className="bg-slate-50 rounded-2xl p-4 text-left space-y-3 mb-6 border border-slate-100">
+              <div className="flex items-start gap-3">
+                <span className="text-lg shrink-0">📱</span>
+                <div className="text-[11px]">
+                  <strong className="block text-slate-900 font-bold">En Android (Chrome):</strong>
+                  <span className="text-slate-600">Toca el menú de 3 puntos (⋮) arriba a la derecha y selecciona <b>"Instalar aplicación"</b> o <b>"Agregar a la pantalla principal"</b>.</span>
+                </div>
+              </div>
+              <div className="h-px bg-slate-200/60" />
+              <div className="flex items-start gap-3">
+                <span className="text-lg shrink-0">🍏</span>
+                <div className="text-[11px]">
+                  <strong className="block text-slate-900 font-bold">En iPhone / iPad (Safari):</strong>
+                  <span className="text-slate-600">Toca el botón <b>Compartir</b> (cuadro con flecha ⎘) en la barra inferior y elige <b>"Agregar al inicio"</b>.</span>
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setShowInstallModal(false)}
+              className="w-full bg-blue-600 text-white py-3.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition shadow-lg shadow-blue-100 cursor-pointer"
+            >
+              Entendido
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 };
