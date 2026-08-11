@@ -148,6 +148,47 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
   const [orderingBusiness, setOrderingBusiness] = useState<DomicilioBusiness | null>(null);
   const [managingBusinessId, setManagingBusinessId] = useState<string>('');
 
+  // AI Poster Generator State
+  const [isPosterModalOpen, setIsPosterModalOpen] = useState(false);
+  const [posterTheme, setPosterTheme] = useState<'modern' | 'vibrant' | 'minimal' | 'delivery'>('modern');
+  const [aiPosterHeadline, setAiPosterHeadline] = useState('');
+  const [aiPosterSubtext, setAiPosterSubtext] = useState('');
+  const [isGeneratingPosterAi, setIsGeneratingPosterAi] = useState(false);
+
+  const handleGenerateAiSlogan = async () => {
+    if (!managingBiz) return;
+    setIsGeneratingPosterAi(true);
+    try {
+      const visibleProds = products.filter(p => p.business_id === managingBiz.id && !p.is_hidden);
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: `Crea un eslogan publicitario corto, sumamente llamativo y profesional para un negocio llamado "${managingBiz.business_name}" (${managingBiz.category}) que vende: ${visibleProds.map(p => p.name).join(', ')}. Devuelve únicamente un texto con el formato JSON: {"headline": "...", "subtext": "..."}. Sin markdown adicional.`,
+          history: [],
+          detectedUser: customerProfile || user,
+          products: visibleProds
+        })
+      });
+      const data = await res.json();
+      if (data.reply) {
+        try {
+          const parsed = JSON.parse(data.reply);
+          if (parsed.headline) setAiPosterHeadline(parsed.headline);
+          if (parsed.subtext) setAiPosterSubtext(parsed.subtext);
+        } catch {
+          setAiPosterHeadline(data.reply.slice(0, 100));
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      setAiPosterHeadline(`¡Lo mejor de ${managingBiz.business_name} directo en tu puerta!`);
+      setAiPosterSubtext('Calidad garantizada y entrega rápida a domicilio en El Salvador.');
+    } finally {
+      setIsGeneratingPosterAi(false);
+    }
+  };
+
   // Map Navigation & GPS State
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({
     lat: 13.6929,
@@ -2706,18 +2747,31 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                         const bizProds = products.filter((p) => p.business_id === managingBiz.id);
                         const allHidden = bizProds.length > 0 && bizProds.every((p) => p.is_hidden);
                         return (
-                          <button
-                            onClick={() => handleToggleAllProductsVisibility(managingBiz.id, !allHidden)}
-                            className={`p-1 rounded-lg transition-colors flex items-center gap-1 px-2 py-1 ${
-                              allHidden 
-                                ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' 
-                                : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                            }`}
-                            title={allHidden ? 'Mostrar todos los productos' : 'Ocultar todos los productos'}
-                          >
-                            {allHidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-                            <span className="text-[10px] font-bold uppercase">{allHidden ? 'Mostrar Todos' : 'Ocultar Todos'}</span>
-                          </button>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              onClick={() => handleToggleAllProductsVisibility(managingBiz.id, !allHidden)}
+                              className={`p-1 rounded-lg transition-colors flex items-center gap-1 px-2 py-1 ${
+                                allHidden 
+                                  ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' 
+                                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                              }`}
+                              title={allHidden ? 'Mostrar todos los productos' : 'Ocultar todos los productos'}
+                            >
+                              {allHidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                              <span className="text-[10px] font-bold uppercase">{allHidden ? 'Mostrar Todos' : 'Ocultar Todos'}</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setAiPosterHeadline(`¡Descubre lo mejor de ${managingBiz.business_name}! Calidad y entrega a domicilio.`);
+                                setAiPosterSubtext('¡Haz tu pedido en línea de forma rápida y segura!');
+                                setIsPosterModalOpen(true);
+                              }}
+                              className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1 shadow-sm transition cursor-pointer"
+                              title="Crear afiche publicitario profesional con los productos visibles usando IA"
+                            >
+                              <Sparkles className="w-3.5 h-3.5 text-amber-200" /> Afiche IA
+                            </button>
+                          </div>
                         );
                       })()}
                     </div>
@@ -4082,6 +4136,213 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
               </button>
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL: AFICHE PUBLICITARIO PROFESIONAL CON IA */}
+      <AnimatePresence>
+        {isPosterModalOpen && managingBiz && (
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-6 bg-stone-900/80 backdrop-blur-md overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white w-full max-w-3xl rounded-3xl shadow-2xl border border-amber-200 overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              {/* Modal Header */}
+              <div className="px-6 py-4 bg-gradient-to-r from-stone-900 to-amber-950 text-white flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-400/30 flex items-center justify-center">
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-black text-sm sm:text-base uppercase tracking-wider">Afiche Publicitario con IA</h3>
+                    <p className="text-[10px] text-amber-200/80">Generado con productos visibles de {managingBiz.business_name}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsPosterModalOpen(false)}
+                  className="p-1.5 text-stone-300 hover:text-white hover:bg-white/10 rounded-full transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Toolbar Controls */}
+              <div className="p-4 bg-stone-50 border-b border-stone-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black uppercase text-stone-700">Estilo:</span>
+                  {(['modern', 'vibrant', 'minimal', 'delivery'] as const).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setPosterTheme(t)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-extrabold uppercase transition ${
+                        posterTheme === t
+                          ? 'bg-amber-600 text-white shadow-xs'
+                          : 'bg-white text-stone-700 border border-stone-200 hover:bg-stone-100'
+                      }`}
+                    >
+                      {t === 'modern' ? 'Elegante' : t === 'vibrant' ? 'Vibrante' : t === 'minimal' ? 'Minimal' : 'Delivery'}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleGenerateAiSlogan}
+                    disabled={isGeneratingPosterAi}
+                    className="px-3.5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-sm flex items-center gap-1.5 transition disabled:opacity-50 cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    {isGeneratingPosterAi ? 'Optimizando...' : 'IA Optimizar Slogan'}
+                  </button>
+                  <button
+                    onClick={() => window.print()}
+                    className="px-3.5 py-2 bg-stone-900 hover:bg-black text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-sm flex items-center gap-1.5 transition cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5" /> Descargar / Imprimir
+                  </button>
+                  <button
+                    onClick={() => {
+                      const visibleProds = products.filter(p => p.business_id === managingBiz.id && !p.is_hidden);
+                      const text = `📢 *${managingBiz.business_name}* 📢\n${aiPosterHeadline || ''}\n\n📦 *Productos Destacados*:\n` +
+                        visibleProds.map(p => `• ${p.name} - $${p.price.toFixed(2)}${p.deal_note ? ` (${p.deal_note})` : ''}`).join('\n') +
+                        `\n\n🛵 ¡Pídelo a domicilio hoy mismo!\n📞 Tel: ${managingBiz.phone || 'N/A'}\n📍 ${managingBiz.address_text || 'El Salvador'}`;
+                      window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+                    }}
+                    className="px-3.5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-black uppercase tracking-wider shadow-sm flex items-center gap-1.5 transition cursor-pointer"
+                  >
+                    <Share2 className="w-3.5 h-3.5" /> WhatsApp
+                  </button>
+                </div>
+              </div>
+
+              {/* Poster Preview Area */}
+              <div className="p-6 overflow-y-auto flex-grow bg-stone-100 flex justify-center">
+                <div
+                  id="ai-poster-canvas"
+                  className={`w-full max-w-2xl rounded-3xl p-6 sm:p-8 shadow-2xl relative overflow-hidden flex flex-col justify-between transition-all ${
+                    posterTheme === 'modern'
+                      ? 'bg-gradient-to-br from-stone-900 via-stone-800 to-amber-950 text-white border-4 border-amber-500/40'
+                      : posterTheme === 'vibrant'
+                      ? 'bg-gradient-to-br from-red-600 via-orange-600 to-amber-600 text-white border-4 border-yellow-300'
+                      : posterTheme === 'minimal'
+                      ? 'bg-white text-stone-900 border-4 border-stone-900'
+                      : 'bg-gradient-to-br from-emerald-800 via-teal-900 to-slate-900 text-white border-4 border-emerald-400'
+                  }`}
+                  style={{ minHeight: '620px' }}
+                >
+                  <div className="absolute -top-24 -right-24 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
+                  <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+
+                  {/* Poster Header */}
+                  <div className="relative z-10 flex items-start justify-between gap-4 border-b pb-5 border-white/15">
+                    <div className="flex items-center gap-4">
+                      {managingBiz.avatar_url ? (
+                        <img
+                          src={managingBiz.avatar_url}
+                          alt={managingBiz.business_name}
+                          className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-white/30 shadow-lg"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-amber-500/20 border-2 border-amber-400 flex items-center justify-center">
+                          <Store className="w-8 h-8 text-amber-300" />
+                        </div>
+                      )}
+                      <div>
+                        <span className="inline-block px-3 py-1 bg-amber-500/20 border border-amber-400/40 text-amber-300 font-black text-[10px] uppercase tracking-widest rounded-full mb-1">
+                          {managingBiz.category} • NewBank A Domicilio
+                        </span>
+                        <h1 className="text-xl sm:text-3xl font-black uppercase tracking-tight text-white drop-shadow-sm">
+                          {managingBiz.business_name}
+                        </h1>
+                        <p className="text-xs text-stone-300 font-medium mt-0.5 flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 text-amber-400 shrink-0" /> {managingBiz.address_text || 'El Salvador'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right hidden sm:block">
+                      <div className="px-3 py-1.5 bg-white/10 backdrop-blur-md rounded-xl border border-white/20 text-[10px] font-black uppercase tracking-widest text-amber-300">
+                        Servicio a Domicilio
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* AI Headline & Subtext */}
+                  <div className="relative z-10 my-6 text-center space-y-2">
+                    <input
+                      type="text"
+                      value={aiPosterHeadline}
+                      onChange={(e) => setAiPosterHeadline(e.target.value)}
+                      placeholder="Escribe un título publicitario impactante..."
+                      className="w-full bg-transparent text-center text-lg sm:text-2xl font-black uppercase tracking-tight text-white placeholder-white/50 border-b border-dashed border-white/30 pb-1 outline-none"
+                    />
+                    <input
+                      type="text"
+                      value={aiPosterSubtext}
+                      onChange={(e) => setAiPosterSubtext(e.target.value)}
+                      placeholder="Subtítulo o llamada a la acción..."
+                      className="w-full bg-transparent text-center text-xs sm:text-sm font-medium text-amber-200 placeholder-amber-200/50 outline-none"
+                    />
+                  </div>
+
+                  {/* Visible Products Grid */}
+                  <div className="relative z-10 my-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {products
+                        .filter(p => p.business_id === managingBiz.id && !p.is_hidden)
+                        .slice(0, 6)
+                        .map((p) => (
+                          <div
+                            key={p.id}
+                            className="bg-white/10 backdrop-blur-md rounded-2xl p-3 border border-white/15 flex flex-col justify-between shadow-md"
+                          >
+                            <div className="relative aspect-square rounded-xl overflow-hidden mb-2 bg-stone-800">
+                              <img
+                                src={p.image_url}
+                                alt={p.name}
+                                className="w-full h-full object-cover"
+                              />
+                              <div className="absolute top-1.5 right-1.5 bg-stone-900/80 backdrop-blur-xs px-2 py-0.5 rounded-full text-xs font-black text-amber-300 border border-white/20">
+                                ${p.price.toFixed(2)}
+                              </div>
+                            </div>
+                            <div>
+                              <h4 className="font-extrabold text-xs text-white uppercase line-clamp-1">{p.name}</h4>
+                              {p.deal_note ? (
+                                <p className="text-[10px] text-amber-300 font-bold mt-0.5 line-clamp-1">🏷️ {p.deal_note}</p>
+                              ) : p.units_per_deal && p.deal_price ? (
+                                <p className="text-[10px] text-amber-300 font-bold mt-0.5 line-clamp-1">🏷️ {p.units_per_deal} por ${p.deal_price.toFixed(2)}</p>
+                              ) : (
+                                <p className="text-[10px] text-stone-300 font-medium mt-0.5">Entrega garantizada</p>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                    {products.filter(p => p.business_id === managingBiz.id && !p.is_hidden).length === 0 && (
+                      <div className="text-center py-8 bg-white/5 rounded-2xl border border-white/10">
+                        <p className="text-xs text-stone-300 italic">No hay productos visibles en el catálogo para mostrar en el afiche.</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Poster Footer */}
+                  <div className="relative z-10 mt-6 pt-4 border-t border-white/15 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-4 h-4 text-amber-400" />
+                      <span className="font-black text-white">WhatsApp / Tel: {managingBiz.phone || 'Disponible en app'}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-amber-500 text-stone-950 font-black px-3 py-1.5 rounded-xl shadow-sm">
+                      <QrCode className="w-4 h-4" />
+                      <span>NewBank Store & A Domicilio El Salvador</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
