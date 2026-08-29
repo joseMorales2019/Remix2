@@ -2246,11 +2246,105 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                   type="button"
                   onClick={handleGoToUserLocation}
                   disabled={isLocatingUser}
-                  className="absolute bottom-4 right-4 bg-red-600 hover:bg-red-700 text-white font-extrabold px-3.5 py-2.5 rounded-xl text-xs shadow-xl border border-red-500 flex items-center gap-2 z-[1001] transition transform active:scale-95 pointer-events-auto"
+                  className="absolute bottom-4 right-4 bg-red-600 hover:bg-red-700 text-white font-extrabold px-3.5 py-2.5 rounded-xl text-xs shadow-xl border border-red-500 flex items-center gap-2 z-[1001] transition transform active:scale-95 pointer-events-auto cursor-pointer"
                 >
                   <Navigation className={`w-4 h-4 ${isLocatingUser ? 'animate-spin' : ''}`} />
                   {isLocatingUser ? 'Obteniendo GPS...' : 'Ir a mi ubicación actual'}
                 </button>
+              </div>
+            </div>
+
+            {/* Guía Paso a Paso para Registrar Negocio y Visualizarlo en el Mapa */}
+            <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-amber-200/80 mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 border-b border-amber-100 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-400/30 flex items-center justify-center text-amber-700">
+                    <Store className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-black text-stone-900">
+                      Pasos para registrar tu negocio y visualizarlo en el mapa
+                    </h3>
+                    <p className="text-[11px] sm:text-xs text-stone-500">
+                      Sigue esta sencilla guía para empezar a vender y recibir pedidos a domicilio
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleTabSelect('register_business')}
+                  className="inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-amber-500 hover:bg-amber-600 text-stone-950 font-black text-xs uppercase tracking-wider rounded-xl shadow-xs transition cursor-pointer"
+                >
+                  <Store className="w-3.5 h-3.5" />
+                  Registrar mi Negocio
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                {/* Paso 1 */}
+                <div className="p-3.5 rounded-xl bg-amber-50/50 border border-amber-200/60 relative flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="w-7 h-7 rounded-lg bg-amber-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                        1
+                      </span>
+                      <User className="w-4 h-4 text-amber-700" />
+                    </div>
+                    <h4 className="font-extrabold text-xs text-stone-900">Iniciar Sesión de Cliente</h4>
+                    <p className="text-[11px] text-stone-600 leading-relaxed">
+                      Identifícate con tu número de teléfono para poder registrar y administrar tus establecimientos y pedidos.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Paso 2 */}
+                <div className="p-3.5 rounded-xl bg-amber-50/50 border border-amber-200/60 relative flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="w-7 h-7 rounded-lg bg-amber-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                        2
+                      </span>
+                      <Store className="w-4 h-4 text-amber-700" />
+                    </div>
+                    <h4 className="font-extrabold text-xs text-stone-900">Ingresar Datos del Negocio</h4>
+                    <p className="text-[11px] text-stone-600 leading-relaxed">
+                      Ve a la pestaña <b>"Registrar Negocio"</b> y completa el nombre comercial, categoría, teléfono y horarios de atención.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Paso 3 */}
+                <div className="p-3.5 rounded-xl bg-amber-50/50 border border-amber-200/60 relative flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="w-7 h-7 rounded-lg bg-amber-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                        3
+                      </span>
+                      <MapPin className="w-4 h-4 text-red-600" />
+                    </div>
+                    <h4 className="font-extrabold text-xs text-stone-900">Fijar Ubicación GPS</h4>
+                    <p className="text-[11px] text-stone-600 leading-relaxed">
+                      Usa el botón de <b>GPS actual</b> o arrastra el marcador en el mapa para establecer las coordenadas exactas de tu local.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Paso 4 */}
+                <div className="p-3.5 rounded-xl bg-amber-50/50 border border-amber-200/60 relative flex flex-col justify-between">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="w-7 h-7 rounded-lg bg-emerald-600 text-white font-black text-xs flex items-center justify-center shadow-xs">
+                        4
+                      </span>
+                      <ShoppingBag className="w-4 h-4 text-emerald-700" />
+                    </div>
+                    <h4 className="font-extrabold text-xs text-stone-900">Publicar Productos & Vender</h4>
+                    <p className="text-[11px] text-stone-600 leading-relaxed">
+                      Agrega tu catálogo con precios y fotos. Tu negocio aparecerá en el mapa con su pin interactivo para recibir pedidos.
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
