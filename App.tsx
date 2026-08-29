@@ -129,8 +129,8 @@ const SmartSlideMenu: React.FC<{ user: any; onSignOut: () => void }> = ({ user, 
 
   // Definición de enlaces con lógica de roles basada en el prompt
   const navLinks = [
-    { to: "/", label: "A Domicilio", icon: "🛵", category: 'Navegación', roles: ['admin', 'especialista', 'estudiante', 'invitado', 'inversionista', 'MYPE', 'aliado', 'jugador', 'ayudame', 'creditos'] },
-    { to: "/dashboard", label: "Inicio / Créditos", icon: "🏠", category: 'Navegación', roles: ['admin', 'especialista', 'estudiante', 'invitado', 'inversionista', 'MYPE', 'aliado', 'jugador', 'ayudame', 'creditos'] },
+    { to: "/", label: "Realizar Pedidos", icon: "🛵", category: 'Navegación', roles: ['admin', 'especialista', 'estudiante', 'invitado', 'inversionista', 'MYPE', 'aliado', 'jugador', 'ayudame', 'creditos'] },
+    { to: "/dashboard", label: "Tienda en linea", icon: "📊", category: 'Navegación', roles: ['admin', 'especialista', 'estudiante', 'invitado', 'inversionista', 'MYPE', 'aliado', 'jugador', 'ayudame', 'creditos'] },
     { to: "/gallery", label: "Galería", icon: "🖼️", category: 'Comunidad', roles: ['admin', 'especialista', 'estudiante', 'inversionista', 'MYPE'] },
 
     { to: "/feedback-requests", label: "Feedback", icon: "📝", category: 'Comunidad', roles: ['admin', 'especialista'] },
@@ -146,17 +146,19 @@ const SmartSlideMenu: React.FC<{ user: any; onSignOut: () => void }> = ({ user, 
     { to: "/apply", label: "Pedido", icon: "💸", category: 'Operaciones', roles: ['admin', 'creditos'] },
     { to: "/ahorros", label: "Mis Ahorros", icon: "💰", category: 'Operaciones', roles: ['admin', 'MYPE', 'creditos'] },
     { to: "/payments", label: "Mis Pagos", icon: "💳", category: 'Operaciones', roles: ['admin', 'especialista', 'estudiante', 'inversionista', 'MYPE', 'creditos'] },
-    { to: "/profile", label: "Mi Perfil", icon: "👤", category: 'Cuenta', roles: ['admin', 'especialista', 'estudiante', 'invitado', 'inversionista', 'MYPE', 'jugador', 'creditos', 'aliado'] },
+    { to: "/profile", label: "Mi Perfil", icon: "👤", category: 'Navegación', roles: ['admin', 'especialista', 'estudiante', 'invitado', 'inversionista', 'MYPE', 'jugador', 'creditos', 'aliado', 'ayudame'] },
     { to: "/payment-requests", label: "Cobros", icon: "💸", category: 'Operaciones', roles: ['admin', 'especialista', 'estudiante', 'inversionista', 'MYPE', 'jugador'] },
     { to: "/admin", label: "Gestión", icon: "⚙️", category: 'Gestión', roles: ['admin', 'aliado'] }
   ].filter(link => {
     if (link.to === "/games") return false;
-    if (!user) return link.to === "/" || link.to === "/games";
+    if (!user) return link.to === "/" || link.to === "/dashboard" || link.to === "/profile";
     // Si es administrador, tiene acceso a todas las rutas relevantes
     if (user.is_admin) return true;
     const type = user.profile_type;
-    // Always show Home for everyone. Games restricted for aliado.
+    // Always show Home, Dashboard and Profile for everyone.
     if (link.to === "/") return true;
+    if (link.to === "/dashboard") return true;
+    if (link.to === "/profile") return true;
     if (link.to === "/games" && type === 'aliado') return false;
     if (link.to === "/games") return true;
     return link.roles.includes(type);
@@ -374,8 +376,12 @@ const SmartSlideMenu: React.FC<{ user: any; onSignOut: () => void }> = ({ user, 
 
           {user ? (
             <div className="space-y-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center font-bold text-blue-600 overflow-hidden relative">
+              <Link 
+                to="/profile"
+                className="flex items-center space-x-3 p-2 -m-2 rounded-2xl hover:bg-slate-100/80 transition-colors group cursor-pointer"
+                title="Ir a Mi Perfil"
+              >
+                <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center font-bold text-blue-600 overflow-hidden relative group-hover:ring-2 group-hover:ring-blue-500 transition-all">
                   {user.profile_image_url ? (
                     <img src={user.profile_image_url} alt="Profile" className="w-full h-full object-cover" />
                   ) : (
@@ -387,14 +393,17 @@ const SmartSlideMenu: React.FC<{ user: any; onSignOut: () => void }> = ({ user, 
                     </div>
                   )}
                 </div>
-                <div className="overflow-hidden">
-                  <p className="font-bold text-slate-900 truncate text-sm">{user.full_name}</p>
+                <div className="overflow-hidden flex-grow">
+                  <div className="flex items-center justify-between">
+                    <p className="font-bold text-slate-900 truncate text-sm group-hover:text-blue-600 transition-colors">{user.full_name}</p>
+                    <span className="text-[10px] text-blue-600 font-bold uppercase ml-1">Ver ›</span>
+                  </div>
                   <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest truncate">{user.reliability_score}/300 pts</p>
                 </div>
-              </div>
+              </Link>
               <button 
                 onClick={onSignOut}
-                className="w-full bg-slate-900 text-white py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-black transition shadow-lg"
+                className="w-full bg-slate-900 text-white py-3 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-black transition shadow-lg cursor-pointer"
               >
                 Cerrar Sesión
               </button>
