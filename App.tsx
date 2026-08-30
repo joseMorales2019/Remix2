@@ -24,6 +24,7 @@ import AliadoOrders from './pages/AliadoOrders';
 import UserOrders from './pages/UserOrders';
 import ITTools from './pages/ITTools';
 import ADomicilio from './pages/ADomicilio';
+import DonacionesAncianos from './pages/DonacionesAncianos';
 
 
 const CommunityScoreIndicator: React.FC = () => {
@@ -131,6 +132,7 @@ const SmartSlideMenu: React.FC<{ user: any; onSignOut: () => void }> = ({ user, 
   const navLinks = [
     { to: "/", label: "Realizar Pedidos", icon: "🛵", category: 'Navegación', roles: ['admin', 'especialista', 'estudiante', 'invitado', 'inversionista', 'MYPE', 'aliado', 'jugador', 'ayudame', 'creditos'] },
     { to: "/dashboard", label: "Tienda en linea", icon: "📊", category: 'Navegación', roles: ['admin', 'especialista', 'estudiante', 'invitado', 'inversionista', 'MYPE', 'aliado', 'jugador', 'ayudame', 'creditos'] },
+    { to: "/donaciones", label: "Donar a Ancianos", icon: "❤️", category: 'Navegación', roles: ['admin', 'especialista', 'estudiante', 'invitado', 'inversionista', 'MYPE', 'aliado', 'jugador', 'ayudame', 'creditos'] },
     { to: "/gallery", label: "Galería", icon: "🖼️", category: 'Comunidad', roles: ['admin', 'especialista', 'estudiante', 'inversionista', 'MYPE'] },
 
     { to: "/feedback-requests", label: "Feedback", icon: "📝", category: 'Comunidad', roles: ['admin', 'especialista'] },
@@ -151,14 +153,15 @@ const SmartSlideMenu: React.FC<{ user: any; onSignOut: () => void }> = ({ user, 
     { to: "/admin", label: "Gestión", icon: "⚙️", category: 'Gestión', roles: ['admin', 'aliado'] }
   ].filter(link => {
     if (link.to === "/games") return false;
-    if (!user) return link.to === "/" || link.to === "/dashboard" || link.to === "/profile";
+    if (!user) return link.to === "/" || link.to === "/dashboard" || link.to === "/profile" || link.to === "/donaciones";
     // Si es administrador, tiene acceso a todas las rutas relevantes
     if (user.is_admin) return true;
     const type = user.profile_type;
-    // Always show Home, Dashboard and Profile for everyone.
+    // Always show Home, Dashboard, Profile and Donaciones for everyone.
     if (link.to === "/") return true;
     if (link.to === "/dashboard") return true;
     if (link.to === "/profile") return true;
+    if (link.to === "/donaciones") return true;
     if (link.to === "/games" && type === 'aliado') return false;
     if (link.to === "/games") return true;
     return link.roles.includes(type);
@@ -667,6 +670,8 @@ const App: React.FC = () => {
             <Route path="/aliado-pedidos" element={userProfile && (userProfile.profile_type === 'aliado' || userProfile.is_admin) ? <AliadoOrders user={userProfile} /> : <Navigate to="/" />} />
             <Route path="/it-tools" element={userProfile && (userProfile.is_admin || ['invitado', 'estudiante', 'especialista', 'aliado'].includes(userProfile.profile_type)) ? <ITTools user={userProfile} /> : <Navigate to="/register" />} />
             <Route path="/mis-pedidos" element={userProfile ? <UserOrders user={userProfile} /> : <Navigate to="/register" />} />
+            <Route path="/donaciones" element={<DonacionesAncianos user={userProfile} />} />
+            <Route path="/donar" element={<DonacionesAncianos user={userProfile} />} />
             <Route path="/terms" element={<Terms />} />
           </Routes>
         </main>

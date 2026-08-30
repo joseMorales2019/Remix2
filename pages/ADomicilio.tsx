@@ -227,10 +227,10 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
     }, 40);
   };
 
-  const handleGoToUserLocation = () => {
+  const handleGoToUserLocation = (notify = true) => {
     setIsLocatingUser(true);
     if (!navigator.geolocation) {
-      showToast('⚠️ Geolocalización no soportada');
+      if (notify) showToast('⚠️ Geolocalización no soportada');
       setIsLocatingUser(false);
       return;
     }
@@ -244,18 +244,23 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
           mapInstanceRef.current.flyTo([userPos.lat, userPos.lng], 14, { duration: 1.2 });
         }
         setIsLocatingUser(false);
-        showToast('📍 Centrado en tu ubicación actual');
+        if (notify) showToast('📍 Centrado en tu ubicación actual');
       },
       (err) => {
         console.warn('Geolocation error:', err);
         setMapCenter({ lat: 13.6929, lng: -89.2182 });
         setMapZoom(13);
         setIsLocatingUser(false);
-        showToast('📍 Mostrando San Salvador, El Salvador');
+        if (notify) showToast('📍 Mostrando San Salvador, El Salvador');
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };
+
+  // Centrar automáticamente en la ubicación del usuario al entrar al mapa
+  useEffect(() => {
+    handleGoToUserLocation(false);
+  }, []);
 
   useEffect(() => {
     if (activeTab === 'explore') {
@@ -2244,7 +2249,7 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                 {/* Botón para ir a la ubicación actual */}
                 <button
                   type="button"
-                  onClick={handleGoToUserLocation}
+                  onClick={() => handleGoToUserLocation(true)}
                   disabled={isLocatingUser}
                   className="absolute bottom-4 right-4 bg-red-600 hover:bg-red-700 text-white font-extrabold px-3.5 py-2.5 rounded-xl text-xs shadow-xl border border-red-500 flex items-center gap-2 z-[1001] transition transform active:scale-95 pointer-events-auto cursor-pointer"
                 >
