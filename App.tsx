@@ -589,6 +589,71 @@ const NotificationHandler: React.FC<{ user: any }> = ({ user }) => {
   );
 };
 
+const GlobalAnalyticsTracker: React.FC<{ user: any }> = ({ user }) => {
+  const location = useLocation();
+
+  useEffect(() => {
+    try {
+      // 1. Unique visitor identifier (accounts for anonymous guest visitors without login)
+      let visitorId = localStorage.getItem('newbank_anon_visitor_id');
+      if (!visitorId) {
+        visitorId = 'vis_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now();
+        localStorage.setItem('newbank_anon_visitor_id', visitorId);
+      }
+
+      // 2. Track unique visitor in registry
+      const uniqueVisitorsSet: string[] = JSON.parse(localStorage.getItem('newbank_analytics_unique_visitors_v2') || '[]');
+      if (!uniqueVisitorsSet.includes(visitorId)) {
+        uniqueVisitorsSet.push(visitorId);
+        localStorage.setItem('newbank_analytics_unique_visitors_v2', JSON.stringify(uniqueVisitorsSet));
+      }
+
+      // 3. Track page views per route
+      const currentPath = location.pathname || '/';
+      const storedViews: Record<string, number> = JSON.parse(localStorage.getItem('newbank_analytics_views_v2') || '{}');
+      storedViews[currentPath] = (storedViews[currentPath] || 0) + 1;
+      localStorage.setItem('newbank_analytics_views_v2', JSON.stringify(storedViews));
+
+      // 4. Track device
+      const ua = navigator.userAgent;
+      const isMobile = /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+      const isTablet = /iPad|Tablet|PlayBook/i.test(ua) || (navigator.maxTouchPoints > 1 && /Macintosh/i.test(ua));
+      const deviceType = isTablet ? 'Tablet' : isMobile ? 'Mobile' : 'Desktop';
+      const storedDevices = JSON.parse(localStorage.getItem('newbank_analytics_devices_v2') || '{"Mobile":0,"Desktop":0,"Tablet":0}');
+      storedDevices[deviceType] = (storedDevices[deviceType] || 0) + 1;
+      localStorage.setItem('newbank_analytics_devices_v2', JSON.stringify(storedDevices));
+
+      // 5. Track live event in history (Guest / Unauthenticated vs Logged in)
+      const isGuest = !user;
+      const recentEvents = JSON.parse(localStorage.getItem('newbank_analytics_events_v2') || '[]');
+      const newEvent = {
+        id: `ev_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        timestamp: new Date().toISOString(),
+        event: isGuest ? `Visitante Invitado (Sin Sesión): Navegando en ${currentPath}` : `Usuario ${user.full_name?.split(' ')[0] || 'Registrado'}: ${currentPath}`,
+        path: currentPath,
+        device: deviceType,
+        isGuest,
+        visitorId
+      };
+      const updatedEvents = [newEvent, ...recentEvents.slice(0, 39)];
+      localStorage.setItem('newbank_analytics_events_v2', JSON.stringify(updatedEvents));
+
+      // 6. Realtime active session heartbeat
+      const activeSessions: Record<string, number> = JSON.parse(localStorage.getItem('newbank_active_heartbeats_v2') || '{}');
+      activeSessions[visitorId] = Date.now();
+      const now = Date.now();
+      Object.keys(activeSessions).forEach(k => {
+        if (now - activeSessions[k] > 5 * 60 * 1000) delete activeSessions[k];
+      });
+      localStorage.setItem('newbank_active_heartbeats_v2', JSON.stringify(activeSessions));
+    } catch (e) {
+      console.warn('Analytics tracker error:', e);
+    }
+  }, [location.pathname, user]);
+
+  return null;
+};
+
 const App: React.FC = () => {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -641,6 +706,7 @@ const App: React.FC = () => {
 
   return (
     <HashRouter>
+      <GlobalAnalyticsTracker user={userProfile} />
       <div className="min-h-screen bg-slate-50 flex flex-col relative pb-20">
         <NotificationHandler user={userProfile} />
         <GlobalAudioPlayer user={userProfile} />
