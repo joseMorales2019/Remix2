@@ -3,9 +3,11 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { supabase } from '../supabase';
 import AliadoOrders from './AliadoOrders';
 import { AdminAvatarPanel, AvataresAdminPanel } from '../components/AvatarSystem';
+import { SystemRealtimeMetrics } from '../components/SystemRealtimeMetrics';
+import { WebAnalyticsRealtime } from '../components/WebAnalyticsRealtime';
 
 const Admin: React.FC<{ user: any }> = ({ user }) => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'users' | 'disputes' | 'approvals' | 'active_loans' | 'verify_payments' | 'saving_vouchers' | 'active_savings' | 'return_vouchers' | 'validacion_pagos' | 'all_loans' | 'control_total' | 'control_global_pagos' | 'projects' | 'payment_requests' | 'store_admin' | 'orders_admin' | 'avatares'>(user?.profile_type === 'aliado' ? 'store_admin' : 'dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'realtime_metrics' | 'web_analytics' | 'users' | 'disputes' | 'approvals' | 'active_loans' | 'verify_payments' | 'saving_vouchers' | 'active_savings' | 'return_vouchers' | 'validacion_pagos' | 'all_loans' | 'control_total' | 'control_global_pagos' | 'projects' | 'payment_requests' | 'store_admin' | 'orders_admin' | 'avatares'>(user?.profile_type === 'aliado' ? 'store_admin' : 'dashboard');
   const [stats, setStats] = useState({
     total_loans: 0,
     active_loans: 0,
@@ -840,7 +842,9 @@ const Admin: React.FC<{ user: any }> = ({ user }) => {
         
         <div className="flex bg-white p-1 rounded-2xl border border-slate-200 shadow-sm overflow-x-auto w-full lg:w-auto">
           {[
-            { id: 'dashboard', label: 'Dashboard', icon: '📊', roles: ['admin'] },
+            { id: 'dashboard', label: 'Dashboard & Métricas', icon: '📊', roles: ['admin'] },
+            { id: 'realtime_metrics', label: 'Métricas en Vivo', icon: '⚡', roles: ['admin'] },
+            { id: 'web_analytics', label: 'Analítica Web', icon: '🌐', roles: ['admin'] },
             { id: 'approvals', label: 'Nuevos', icon: '✨', roles: ['admin'] },
             { id: 'saving_vouchers', label: 'Vouchers Ahorro', icon: '💰', roles: ['admin'] },
             { id: 'active_savings', label: 'Ahorros Vigentes', icon: '📈', roles: ['admin'] },
@@ -940,20 +944,15 @@ const Admin: React.FC<{ user: any }> = ({ user }) => {
         </div>
       )}
 
-      {activeTab === 'dashboard' && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-           {[
-              { label: 'Total Préstamos', value: stats.total_loans, color: 'text-blue-600', bg: 'bg-blue-50' },
-              { label: 'Capital Activo', value: `$${stats.total_disbursed}`, color: 'text-green-600', bg: 'bg-green-50' },
-              { label: 'Liquidez Ahorros', value: `$${stats.total_savings.toFixed(2)}`, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-              { label: 'Mora', value: stats.defaulted_loans, color: 'text-red-600', bg: 'bg-red-50' },
-            ].map((stat, i) => (
-              <div key={i} className={`${stat.bg} p-6 rounded-3xl border border-white shadow-sm`}>
-                <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">{stat.label}</div>
-                <div className={`text-3xl font-black ${stat.color}`}>{stat.value}</div>
-              </div>
-            ))}
-        </div>
+      {(activeTab === 'dashboard' || activeTab === 'realtime_metrics') && (
+        <SystemRealtimeMetrics 
+          user={user} 
+          onNavigateTab={(tabId) => setActiveTab(tabId as any)} 
+        />
+      )}
+
+      {activeTab === 'web_analytics' && (
+        <WebAnalyticsRealtime user={user} />
       )}
 
       {activeTab === 'projects' && (
