@@ -1763,7 +1763,10 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
       console.log(`Manual trigger match found: ${bestMatchVideo}`);
       const videoUrl = `https://stqthrzbvuqcavtsonba.supabase.co/storage/v1/object/public/newbankVideoAnimadoAvatar/${bestMatchVideo}`;
       setTempVideoUrl(videoUrl);
-      setQuestion("");
+      const updatedConfig = { ...config, video_url: videoUrl };
+      setConfig(updatedConfig);
+      saveStoredConfig(updatedConfig);
+      window.dispatchEvent(new Event('avatar-config-updated'));
     } else {
       console.log("No video triggers matched for question:", currentQuestion);
       setIsGenerating(true);
@@ -1847,6 +1850,7 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
 
               const updatedConfig = {
                 ...config,
+                video_url: statusData.video_url, // Make the newly created response video active immediately
                 video_emotions: newEmotions,
                 video_triggers: newTriggers
               };
@@ -1872,7 +1876,7 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
                   video_settings: updatedConfig.video_settings,
                   video_triggers: updatedConfig.video_triggers,
                   is_tiktoker_mode_enabled: updatedConfig.is_tiktoker_mode_enabled,
-                  video_url: updatedConfig.video_url // retain the active standby video unchanged
+                  video_url: statusData.video_url // Set newly created video as active
                 });
               } catch (dbErr) {
                 console.warn("Could not save new generated video triggers/emotions to DB:", dbErr);
@@ -1975,19 +1979,23 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
   const currentImageFromSeq = resolveImageUrl(rawImageFromSeq, config, userBaseImage);
 
   // Crossfade and transition tracking to avoid abrupt transitions between videos
-  const activeSource = (currentActiveVideoUrl && !(currentImageFromSeq.match(/\.(mp4|webm|ogg)$/i) || currentImageFromSeq.includes('VideoAnimadoAvatar')))
+  const activeSource = tempVideoUrl
+    ? tempVideoUrl
+    : (currentActiveVideoUrl && !(currentImageFromSeq.match(/\.(mp4|webm|ogg)$/i) || currentImageFromSeq.includes('VideoAnimadoAvatar')))
     ? currentActiveVideoUrl
     : (currentImageFromSeq.match(/\.(mp4|webm|ogg)$/i) || currentImageFromSeq.includes('VideoAnimadoAvatar'))
     ? currentImageFromSeq
-    : null;
+    : currentActiveVideoUrl || null;
 
   const finalVideoSource = activeSource;
 
   // Play video automatically when speaking or active, watching the actual video source
   useEffect(() => {
-    if (videoRef.current) {
-      videoRef.current.muted = !isSpeaking;
-      const playPromise = videoRef.current.play();
+    if (videoRef.current && finalVideoSource) {
+      const v = videoRef.current;
+      v.muted = !isSpeaking;
+      v.currentTime = 0;
+      const playPromise = v.play();
       if (playPromise !== undefined) {
         playPromise.catch(error => {
           console.log("Autoplay with audio deferred by browser protection. Playing muted first.", error);
@@ -2190,6 +2198,18 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
             )}
 
             <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center relative bg-white">
+              {/* Permanent base avatar image underlay so it never stays blank */}
+              <img
+                src={currentImageFromSeq}
+                alt="Smart Avatar Face"
+                style={{ 
+                  filter: activeFilter,
+                  transform: activeCameraStyle.transform
+                }}
+                className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                referrerPolicy="no-referrer"
+              />
+
               {/* Previous Video Transition Layer for Seamless Crossfading */}
               {transitionState.prevUrl && (
                 <video
@@ -2228,6 +2248,24 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
                   src={finalVideoSource}
                   autoPlay
                   loop={false}
+                  onLoadedMetadata={(e) => {
+                    const video = e.currentTarget;
+                    video.play().catch(() => {
+                      video.muted = true;
+                      video.play().catch(() => {});
+                    });
+                  }}
+                  onCanPlay={(e) => {
+                    const video = e.currentTarget;
+                    video.play().catch(() => {
+                      video.muted = true;
+                      video.play().catch(() => {});
+                    });
+                  }}
+                  onError={() => {
+                    console.warn("Video playback error for source:", finalVideoSource);
+                    if (tempVideoUrl) setTempVideoUrl(null);
+                  }}
                   onEnded={(e) => handleVideoEnded(finalVideoSource, e)}
                   muted={!isSpeaking}
                   playsInline
@@ -2242,18 +2280,7 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
                     video.muted = !video.muted;
                   }}
                 />
-              ) : (
-                <img
-                  src={currentImageFromSeq}
-                  alt="Smart Avatar Face"
-                  style={{ 
-                    filter: activeFilter,
-                    transform: activeCameraStyle.transform
-                  }}
-                  className={`w-full h-full object-cover transition-all ease-out transition-opacity duration-[1500ms] ease-in-out ${currentOpacityClass}`}
-                  referrerPolicy="no-referrer"
-                />
-              )}
+              ) : null}
             </div>
 
             {/* Minimize button overlay on avatar circle bottom right corner */}
@@ -2301,6 +2328,18 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
           )}
 
           <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center relative bg-white">
+            {/* Permanent base avatar image underlay so it never stays blank */}
+            <img
+              src={currentImageFromSeq}
+              alt="Smart Avatar Face"
+              style={{ 
+                filter: activeFilter,
+                transform: activeCameraStyle.transform
+              }}
+              className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+              referrerPolicy="no-referrer"
+            />
+
             {/* Previous Video Transition Layer for Seamless Crossfading */}
             {transitionState.prevUrl && (
               <video
@@ -2339,6 +2378,24 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
                 src={finalVideoSource}
                 autoPlay
                 loop={false}
+                onLoadedMetadata={(e) => {
+                  const video = e.currentTarget;
+                  video.play().catch(() => {
+                    video.muted = true;
+                    video.play().catch(() => {});
+                  });
+                }}
+                onCanPlay={(e) => {
+                  const video = e.currentTarget;
+                  video.play().catch(() => {
+                    video.muted = true;
+                    video.play().catch(() => {});
+                  });
+                }}
+                onError={() => {
+                  console.warn("Video playback error for source:", finalVideoSource);
+                  if (tempVideoUrl) setTempVideoUrl(null);
+                }}
                 onEnded={(e) => handleVideoEnded(finalVideoSource, e)}
                 muted={!isSpeaking}
                 playsInline
@@ -2353,18 +2410,7 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
                   video.muted = !video.muted;
                 }}
               />
-            ) : (
-              <img
-                src={currentImageFromSeq}
-                alt="Smart Avatar Face"
-                style={{ 
-                  filter: activeFilter,
-                  transform: activeCameraStyle.transform
-                }}
-                className={`w-full h-full object-cover transition-all ease-out transition-opacity duration-[1500ms] ease-in-out ${currentOpacityClass}`}
-                referrerPolicy="no-referrer"
-              />
-            )}
+            ) : null}
           </div>
 
           {/* Audio Wave Modulation Bars Overlay removed */}
