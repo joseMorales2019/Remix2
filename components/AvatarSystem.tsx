@@ -1558,11 +1558,29 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
   const [tempVideoUrl, setTempVideoUrl] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
   const transcriptRef = useRef("");
+  const pressStartTimeRef = useRef(0);
+  const isPressingRef = useRef(false);
+  const hasSubmittedRef = useRef(false);
+  const processTimeoutRef = useRef<any>(null);
+
+  const processRecognizedQuestion = () => {
+    if (hasSubmittedRef.current) return;
+    const textToSend = (transcriptRef.current || question).trim();
+    if (textToSend) {
+      hasSubmittedRef.current = true;
+      handleSendQuestion(textToSend);
+    }
+  };
 
   const startListening = () => {
-    setIsListening(true);
+    if (processTimeoutRef.current) {
+      clearTimeout(processTimeoutRef.current);
+      processTimeoutRef.current = null;
+    }
+    hasSubmittedRef.current = false;
     transcriptRef.current = "";
     setQuestion("");
+    setIsListening(true);
     
     const SpeechRecognitionObject = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognitionObject) {
@@ -1570,26 +1588,26 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
       setIsListening(false);
       return;
     }
+
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch (e) {}
+    }
     
     try {
       const rec = new SpeechRecognitionObject();
-      rec.continuous = false;
+      rec.continuous = true;
       rec.interimResults = true;
       rec.lang = "es-SV";
       
       rec.onresult = (event: any) => {
-        let interimTranscript = '';
-        let finalTranscript = '';
-        
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript;
-          } else {
-            interimTranscript += event.results[i][0].transcript;
-          }
+        let fullTranscript = '';
+        for (let i = 0; i < event.results.length; ++i) {
+          fullTranscript += event.results[i][0].transcript;
         }
         
-        const currentText = finalTranscript || interimTranscript;
+        const currentText = fullTranscript.trim();
         if (currentText) {
           setQuestion(currentText);
           transcriptRef.current = currentText;
@@ -1597,16 +1615,21 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
       };
       
       rec.onerror = (event: any) => {
-        console.error("Speech recognition error:", event.error);
+        console.warn("Speech recognition error:", event.error);
+        if (event.error === 'no-speech') {
+          return;
+        }
         setIsListening(false);
       };
       
       rec.onend = () => {
         setIsListening(false);
-        const textToSend = transcriptRef.current.trim();
-        if (textToSend) {
-          handleSendQuestion(textToSend);
+        if (processTimeoutRef.current) {
+          clearTimeout(processTimeoutRef.current);
         }
+        processTimeoutRef.current = setTimeout(() => {
+          processRecognizedQuestion();
+        }, 150);
       };
       
       recognitionRef.current = rec;
@@ -1617,7 +1640,8 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
     }
   };
 
-  const stopListening = () => {
+  const stopListeningAndProcess = () => {
+    setIsListening(false);
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
@@ -1625,14 +1649,84 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
         console.error("Error stopping voice recognition:", e);
       }
     }
-    setIsListening(false);
+    if (processTimeoutRef.current) {
+      clearTimeout(processTimeoutRef.current);
+    }
+    // Pasado al soltar dicho boton se procesa la pregunta dando tiempo al transcript final
+    processTimeoutRef.current = setTimeout(() => {
+      processRecognizedQuestion();
+    }, 350);
+  };
+
+  const stopListening = () => {
+    stopListeningAndProcess();
+  };
+
+  const handleVoicePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch (err) {}
+
+    isPressingRef.current = true;
+    pressStartTimeRef.current = Date.now();
+
+    // Borrar de inmediato cualquier texto anterior que se encuentre en el cuadro
+    setQuestion("");
+    transcriptRef.current = "";
+
+    if (!isListening) {
+      startListening();
+    }
+  };
+
+  const handleVoicePointerUp = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (!isPressingRef.current) return;
+    isPressingRef.current = false;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch (err) {}
+
+    const pressDuration = Date.now() - pressStartTimeRef.current;
+
+    if (pressDuration > 250 || transcriptRef.current.trim().length > 0) {
+      stopListeningAndProcess();
+    }
+  };
+
+  const handleVoicePointerCancel = (e: React.PointerEvent<HTMLButtonElement>) => {
+    if (isPressingRef.current) {
+      isPressingRef.current = false;
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch (err) {}
+      if (transcriptRef.current.trim().length > 0) {
+        stopListeningAndProcess();
+      } else {
+        setIsListening(false);
+        if (recognitionRef.current) {
+          try {
+            recognitionRef.current.stop();
+          } catch (err) {}
+        }
+      }
+    }
+  };
+
+  const handleVoiceClick = () => {
+    if (isListening && !isPressingRef.current) {
+      stopListeningAndProcess();
+    }
   };
 
   useEffect(() => {
     return () => {
+      if (processTimeoutRef.current) {
+        clearTimeout(processTimeoutRef.current);
+      }
       if (recognitionRef.current) {
         try {
-          recognitionRef.current.stop();
+          recognitionRef.current.abort();
         } catch (e) {}
       }
     };
@@ -1641,6 +1735,11 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
   const handleSendQuestion = async (textToUse?: string) => {
     const currentQuestion = textToUse !== undefined ? textToUse : question;
     if (!currentQuestion.trim() || isGenerating) return;
+
+    // Limpiar de inmediato el cuadro de pregunta y el transcript para cada nueva pregunta
+    setQuestion("");
+    transcriptRef.current = "";
+
     const lowerText = currentQuestion.toLowerCase();
     let bestMatchVideo: string | null = null;
     let matchScore = 0;
@@ -2297,7 +2396,7 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
                     handleSendQuestion();
                   }
                 }}
-                placeholder={isListening ? "Escuchando... Habla ahora..." : "Escribe tu pregunta aquí..."}
+                placeholder={isListening ? "Escuchando... Habla y suelta para procesar..." : "Escribe tu pregunta aquí..."}
                 className={`w-full h-16 px-3 py-2 text-xs md:text-sm text-slate-700 rounded-xl border focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 resize-none transition-all ${
                   isListening 
                     ? "bg-red-50/20 border-red-300 ring-2 ring-red-500/20" 
@@ -2314,13 +2413,17 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={isListening ? stopListening : startListening}
-                  className={`px-3 py-2 rounded-xl text-xs font-semibold shadow-md flex items-center justify-center transition-all active:scale-[0.98] ${
+                  onPointerDown={handleVoicePointerDown}
+                  onPointerUp={handleVoicePointerUp}
+                  onPointerCancel={handleVoicePointerCancel}
+                  onClick={handleVoiceClick}
+                  className={`px-3 py-2 rounded-xl text-xs font-semibold shadow-md flex items-center justify-center transition-all select-none touch-none ${
                     isListening 
-                      ? "bg-red-500 hover:bg-red-600 text-white animate-pulse" 
-                      : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200"
+                      ? "bg-red-500 hover:bg-red-600 text-white animate-pulse ring-2 ring-red-400/50" 
+                      : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 active:scale-[0.98]"
                   }`}
-                  title={isListening ? "Detener grabación de voz" : "Preguntar con tu voz"}
+                  title={isListening ? "Suelta para procesar tu pregunta" : "Preguntar con tu voz"}
+                  aria-label="Preguntar con tu voz"
                 >
                   {isListening ? <MicOff size={15} /> : <Mic size={15} />}
                 </button>
