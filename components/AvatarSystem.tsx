@@ -1916,7 +1916,7 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
               setIsGenerating(false);
             }, 3000);
           }
-        }, 1200);
+        }, 800);
 
       } catch (err: any) {
         setGenerationProgress(0);
@@ -2001,28 +2001,29 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
     setVerificationPassed(Boolean(activeSeqExist && assetsAreValid));
   }, [sequences, userBaseImage]);
 
-  // High-fidelity camera motion effects mapped directly to the 5 photograms
+  // High-fidelity smooth camera motion effects mapped to the 5 photograms (smoothed transition)
   const cameraTransforms = [
     { transform: "scale(1.04) translate(0px, 0px) rotate(0deg)" },
-    { transform: "scale(1.08) translate(-1.5px, -1px) rotate(-1deg)" },
-    { transform: "scale(1.12) translate(1px, -3px) rotate(0.8deg)" },
-    { transform: "scale(1.09) translate(2.5px, -2px) rotate(-0.5deg)" },
-    { transform: "scale(1.15) translate(0px, -4.5px) rotate(1.4deg)" }
+    { transform: "scale(1.06) translate(-0.8px, -0.5px) rotate(-0.5deg)" },
+    { transform: "scale(1.08) translate(0.5px, -1.5px) rotate(0.4deg)" },
+    { transform: "scale(1.06) translate(1px, -1px) rotate(-0.2deg)" },
+    { transform: "scale(1.09) translate(0px, -2px) rotate(0.7deg)" }
   ];
 
-  const activeCameraStyle = isSpeaking 
+  // Only apply synthetic camera wiggle when strictly in static image photogram mode; when video is running, let video render at full 60fps native fluidity
+  const activeCameraStyle = (isSpeaking && !finalVideoSource)
     ? cameraTransforms[frameIndex % 5] 
-    : { transform: "scale(1.04) translate(0px, 0px) rotate(0deg)" };
+    : { transform: "scale(1.0) translate(0px, 0px) rotate(0deg)" };
 
-  // Lighting matrices matching each photogram to create high quality facial luminosity
+  // Lighting matrices matching each photogram
   const filterPresets = [
     "contrast(102%) saturate(106%) brightness(100%) hue-rotate(2deg)",
-    "contrast(106%) saturate(112%) brightness(102%) hue-rotate(4deg) drop-shadow(0 2px 8px rgba(59,130,246,0.15))",
-    "contrast(110%) saturate(118%) brightness(104%) hue-rotate(6deg) drop-shadow(0 4px 12px rgba(59,130,246,0.25))",
-    "contrast(107%) saturate(114%) brightness(103%) hue-rotate(4deg) drop-shadow(0 3px 10px rgba(59,130,246,0.2))",
-    "contrast(112%) saturate(122%) brightness(105%) hue-rotate(8deg) drop-shadow(0 5px 16px rgba(59,130,246,0.35))"
+    "contrast(104%) saturate(108%) brightness(101%) hue-rotate(3deg)",
+    "contrast(106%) saturate(110%) brightness(102%) hue-rotate(4deg)",
+    "contrast(104%) saturate(108%) brightness(101%) hue-rotate(3deg)",
+    "contrast(106%) saturate(112%) brightness(102%) hue-rotate(5deg)"
   ];
-  const activeFilter = isSpeaking ? filterPresets[frameIndex % 5] : "contrast(102%) saturate(105%) brightness(100%)";
+  const activeFilter = (isSpeaking && !finalVideoSource) ? filterPresets[frameIndex % 5] : "contrast(100%) saturate(100%) brightness(100%)";
 
   // YouTube technology 1: Background Pre-buffering
   useEffect(() => {
@@ -2075,74 +2076,79 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
 
     const wantSound = Boolean(tempVideoUrl) || isSpeaking;
 
+    const playVideoInstance = (v: HTMLVideoElement) => {
+      v.muted = isAudioMuted || !wantSound;
+      const playPromise = v.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {
+          // Autoplay policy fallback: mute and play immediately without blocking
+          v.muted = true;
+          v.play().catch(() => {});
+        });
+      }
+    };
+
     if (activeSlot === 'A') {
       if (slotASrc === finalVideoSource) {
         setSlotAVisible(true);
         if (videoRefA.current) {
-          const v = videoRefA.current;
-          v.muted = isAudioMuted || !wantSound;
-          v.play().catch(() => {
-            v.muted = true;
-            v.play().catch(() => {});
-          });
+          playVideoInstance(videoRefA.current);
         }
         return;
       }
-      // Prepare incoming slot B with preloading
+      // Prepare incoming slot B with preloading & auto-play
       setSlotBSrc(finalVideoSource);
+      // Immediately prepare DOM element if available
+      if (videoRefB.current) {
+        const v = videoRefB.current;
+        if (v.src !== finalVideoSource) {
+          v.src = finalVideoSource;
+          v.load();
+        }
+        playVideoInstance(v);
+      }
       setTimeout(() => {
         if (videoRefB.current) {
           const v = videoRefB.current;
-          v.src = finalVideoSource;
-          v.preload = 'auto';
-          v.load();
-          v.currentTime = 0;
-          v.muted = isAudioMuted || !wantSound;
-          const p = v.play();
-          if (p) {
-            p.catch(() => {
-              v.muted = true;
-              v.play().catch(() => {});
-            });
+          if (v.src !== finalVideoSource) {
+            v.src = finalVideoSource;
+            v.load();
           }
+          playVideoInstance(v);
         }
-      }, 0);
+      }, 10);
     } else {
       if (slotBSrc === finalVideoSource) {
         setSlotBVisible(true);
         if (videoRefB.current) {
-          const v = videoRefB.current;
-          v.muted = isAudioMuted || !wantSound;
-          v.play().catch(() => {
-            v.muted = true;
-            v.play().catch(() => {});
-          });
+          playVideoInstance(videoRefB.current);
         }
         return;
       }
-      // Prepare incoming slot A with preloading
+      // Prepare incoming slot A with preloading & auto-play
       setSlotASrc(finalVideoSource);
+      if (videoRefA.current) {
+        const v = videoRefA.current;
+        if (v.src !== finalVideoSource) {
+          v.src = finalVideoSource;
+          v.load();
+        }
+        playVideoInstance(v);
+      }
       setTimeout(() => {
         if (videoRefA.current) {
           const v = videoRefA.current;
-          v.src = finalVideoSource;
-          v.preload = 'auto';
-          v.load();
-          v.currentTime = 0;
-          v.muted = isAudioMuted || !wantSound;
-          const p = v.play();
-          if (p) {
-            p.catch(() => {
-              v.muted = true;
-              v.play().catch(() => {});
-            });
+          if (v.src !== finalVideoSource) {
+            v.src = finalVideoSource;
+            v.load();
           }
+          playVideoInstance(v);
         }
-      }, 0);
+      }, 10);
     }
-  }, [finalVideoSource, isSpeaking, tempVideoUrl]);
+  }, [finalVideoSource, isSpeaking, tempVideoUrl, activeSlot, slotASrc, slotBSrc, isAudioMuted]);
 
-  // YouTube technology 3: Instant swap when incoming slot renders first frame
+  // YouTube technology 3: Instant swap as soon as incoming slot renders frames or plays
   const handleSlotReadyToDisplay = (slot: 'A' | 'B') => {
     if (slot === 'B') {
       setActiveSlot('B');
@@ -2152,7 +2158,7 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
         if (videoRefA.current) {
           videoRefA.current.pause();
         }
-      }, 250);
+      }, 100);
     } else {
       setActiveSlot('A');
       setSlotAVisible(true);
@@ -2161,7 +2167,7 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
         if (videoRefB.current) {
           videoRefB.current.pause();
         }
-      }, 250);
+      }, 100);
     }
   };
 
@@ -2214,7 +2220,7 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
 
   // YouTube technology 5: Shared Hardware-Accelerated Video Media Core
   const renderAvatarMediaCore = () => (
-    <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center relative bg-slate-900">
+    <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center relative bg-slate-900 transform-gpu">
       {/* Permanent safe base avatar photo underlay - NEVER blank white */}
       <img
         src={safeUnderlayImage}
@@ -2225,6 +2231,7 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
         style={{ 
           filter: activeFilter,
           transform: activeCameraStyle.transform,
+          transition: "transform 0.4s ease-out, filter 0.4s ease-out",
           willChange: "transform, opacity",
           backfaceVisibility: "hidden"
         }}
@@ -2253,6 +2260,10 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
               v.muted = true;
               v.play().catch(() => {});
             });
+            if (slotASrc) handleSlotReadyToDisplay('A');
+          }}
+          onLoadedData={() => {
+            if (slotASrc) handleSlotReadyToDisplay('A');
           }}
           onCanPlay={(e) => {
             const v = e.currentTarget;
@@ -2260,6 +2271,7 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
               v.muted = true;
               v.play().catch(() => {});
             });
+            if (slotASrc) handleSlotReadyToDisplay('A');
           }}
           onPlaying={() => {
             if (slotASrc) handleSlotReadyToDisplay('A');
@@ -2275,14 +2287,12 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
             if (tempVideoUrl && slotASrc === tempVideoUrl) setTempVideoUrl(null);
           }}
           style={{ 
-            filter: activeFilter,
-            transform: activeCameraStyle.transform,
-            willChange: "transform, opacity",
+            willChange: "opacity, transform",
             backfaceVisibility: "hidden",
             WebkitBackfaceVisibility: "hidden",
-            transformStyle: "preserve-3d"
+            transform: "translate3d(0, 0, 0)"
           }}
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 ease-out ${
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-150 ease-out ${
             slotAVisible ? "opacity-100 z-20 pointer-events-auto" : "opacity-0 z-10 pointer-events-none"
           }`}
           onClick={handleVideoClick}
@@ -2310,6 +2320,10 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
               v.muted = true;
               v.play().catch(() => {});
             });
+            if (slotBSrc) handleSlotReadyToDisplay('B');
+          }}
+          onLoadedData={() => {
+            if (slotBSrc) handleSlotReadyToDisplay('B');
           }}
           onCanPlay={(e) => {
             const v = e.currentTarget;
@@ -2317,6 +2331,7 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
               v.muted = true;
               v.play().catch(() => {});
             });
+            if (slotBSrc) handleSlotReadyToDisplay('B');
           }}
           onPlaying={() => {
             if (slotBSrc) handleSlotReadyToDisplay('B');
@@ -2332,14 +2347,12 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
             if (tempVideoUrl && slotBSrc === tempVideoUrl) setTempVideoUrl(null);
           }}
           style={{ 
-            filter: activeFilter,
-            transform: activeCameraStyle.transform,
-            willChange: "transform, opacity",
+            willChange: "opacity, transform",
             backfaceVisibility: "hidden",
             WebkitBackfaceVisibility: "hidden",
-            transformStyle: "preserve-3d"
+            transform: "translate3d(0, 0, 0)"
           }}
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 ease-out ${
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-150 ease-out ${
             slotBVisible ? "opacity-100 z-20 pointer-events-auto" : "opacity-0 z-10 pointer-events-none"
           }`}
           onClick={handleVideoClick}
