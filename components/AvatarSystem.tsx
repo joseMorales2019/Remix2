@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../supabase';
-import { Play, RotateCcw, VolumeX, Shuffle, Zap, Terminal, Send, Maximize2, Minimize2, Mic, MicOff, Plus, Trash2, Check, Copy, Sparkles, CheckCircle } from 'lucide-react';
+import { Play, RotateCcw, Volume2, VolumeX, Shuffle, Zap, Terminal, Send, Maximize2, Minimize2, Mic, MicOff, Plus, Trash2, Check, Copy, Sparkles, CheckCircle } from 'lucide-react';
 
 const getApiUrl = (path: string): string => {
   if (path.startsWith("http://") || path.startsWith("https://")) {
@@ -1776,6 +1776,11 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
       setConfig(updatedConfig);
       saveStoredConfig(updatedConfig);
       window.dispatchEvent(new Event('avatar-config-updated'));
+
+      const matchedEmotion = config.video_emotions?.[bestMatchVideo] || "";
+      if (matchedEmotion && !isAudioMuted) {
+        speakAvatarVoice(matchedEmotion);
+      }
     } else {
       console.log("No video triggers matched for question:", currentQuestion);
       setIsGenerating(true);
@@ -1859,6 +1864,11 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
 
               // Dynamically play this video automatically & immediately without delay
               setTempVideoUrl(statusData.video_url);
+
+              // Voice the generated response text clearly in sync with video
+              if (respuestaGenerada && !isAudioMuted) {
+                speakAvatarVoice(respuestaGenerada);
+              }
 
               // Extract video name to map action and trigger
               const videoName = statusData.video_url.split('/').pop() || "";
@@ -2065,8 +2075,111 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
 
   const videoRefA = useRef<HTMLVideoElement>(null);
   const videoRefB = useRef<HTMLVideoElement>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const activeSpeechSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
-  // Synchronize incoming video into inactive slot and trigger instant buffer & playback
+  // Stop any active text-to-speech synthesis
+  const stopAvatarSpeech = () => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    if (activeSpeechSourceRef.current) {
+      try {
+        activeSpeechSourceRef.current.stop();
+        activeSpeechSourceRef.current.disconnect();
+      } catch (e) {}
+      activeSpeechSourceRef.current = null;
+    }
+  };
+
+  // Speak avatar response text clearly in natural Salvadoran Spanish
+  const speakAvatarVoice = async (textToSpeak: string) => {
+    if (!textToSpeak || isAudioMuted) return;
+    stopAvatarSpeech();
+
+    try {
+      const response = await fetch(getApiUrl("/api/tts"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: textToSpeak, voice: "Zephyr" })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.audio) {
+          if (!audioCtxRef.current) {
+            audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+          }
+          const audioCtx = audioCtxRef.current;
+          if (audioCtx.state === 'suspended') {
+            await audioCtx.resume();
+          }
+
+          const binaryString = window.atob(data.audio);
+          const len = binaryString.length;
+          const bytes = new Uint8Array(len);
+          for (let i = 0; i < len; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          const audioBuffer = await audioCtx.decodeAudioData(bytes.buffer);
+          const source = audioCtx.createBufferSource();
+          source.buffer = audioBuffer;
+          source.connect(audioCtx.destination);
+          activeSpeechSourceRef.current = source;
+          source.onended = () => {
+            if (activeSpeechSourceRef.current === source) {
+              activeSpeechSourceRef.current = null;
+            }
+          };
+          source.start(0);
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn("TTS API fallback to native speech:", e);
+    }
+
+    // Web Speech API fallback for local browser synthesis
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(textToSpeak);
+      utterance.lang = 'es-SV';
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      const voices = window.speechSynthesis.getVoices();
+      const esVoice = voices.find(v => v.lang.includes('es-SV') || v.lang.includes('es-') || v.lang.includes('es'));
+      if (esVoice) utterance.voice = esVoice;
+      window.speechSynthesis.speak(utterance);
+    }
+  };
+
+  // Helper to ensure all video audio elements and audio contexts are unlocked
+  const unlockAllAudio = () => {
+    if (isAudioMuted) return;
+    [videoRefA.current, videoRefB.current].forEach(v => {
+      if (v) {
+        v.volume = 1.0;
+        if (v.muted) {
+          v.muted = false;
+        }
+        if (v.paused && v.src) {
+          v.play().catch(() => {});
+        }
+      }
+    });
+    if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+      audioCtxRef.current.resume().catch(() => {});
+    }
+  };
+
+  // Clean up speech on unmount
+  useEffect(() => {
+    return () => {
+      stopAvatarSpeech();
+    };
+  }, []);
+
+  // Synchronize incoming video into inactive slot and trigger instant buffer & audible playback
   useEffect(() => {
     if (!finalVideoSource) {
       setSlotAVisible(false);
@@ -2074,14 +2187,13 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
       return;
     }
 
-    const wantSound = Boolean(tempVideoUrl) || isSpeaking;
-
     const playVideoInstance = (v: HTMLVideoElement) => {
-      v.muted = isAudioMuted || !wantSound;
+      v.volume = 1.0;
+      v.muted = isAudioMuted;
       const playPromise = v.play();
       if (playPromise !== undefined) {
         playPromise.catch(() => {
-          // Autoplay policy fallback: mute and play immediately without blocking
+          // If browser strictly blocks unmuted autoplay without prior interaction, start muted and unlock upon first user gesture
           v.muted = true;
           v.play().catch(() => {});
         });
@@ -2172,9 +2284,6 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
   };
 
   const handleSlotEnded = (slot: 'A' | 'B', url: string, e: React.SyntheticEvent<HTMLVideoElement>) => {
-    if (videoSettings.mute_at_end) {
-      setIsAudioMuted(true);
-    }
     window.dispatchEvent(new CustomEvent('avatar-video-ended', { 
       detail: { videoUrl: url } 
     }));
@@ -2195,18 +2304,25 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
   const handleVideoClick = () => {
     const nextMuted = !isAudioMuted;
     setIsAudioMuted(nextMuted);
-    if (videoRefA.current) videoRefA.current.muted = nextMuted;
-    if (videoRefB.current) videoRefB.current.muted = nextMuted;
+    if (nextMuted) {
+      stopAvatarSpeech();
+    }
+    if (videoRefA.current) {
+      videoRefA.current.muted = nextMuted;
+      videoRefA.current.volume = 1.0;
+      if (!nextMuted) videoRefA.current.play().catch(() => {});
+    }
+    if (videoRefB.current) {
+      videoRefB.current.muted = nextMuted;
+      videoRefB.current.volume = 1.0;
+      if (!nextMuted) videoRefB.current.play().catch(() => {});
+    }
   };
 
-  // YouTube technology 4: Automatic user gesture audio unlock
+  // YouTube technology 4: Automatic user gesture audio unlock (browser autoplay policy unlock)
   useEffect(() => {
     const handleUnmuteGesture = () => {
-      const activeRef = activeSlot === 'A' ? videoRefA.current : videoRefB.current;
-      if (activeRef && activeRef.muted && (tempVideoUrl || isSpeaking)) {
-        activeRef.muted = false;
-        activeRef.play().catch(() => {});
-      }
+      unlockAllAudio();
     };
     window.addEventListener('click', handleUnmuteGesture, { passive: true });
     window.addEventListener('keydown', handleUnmuteGesture, { passive: true });
@@ -2216,7 +2332,7 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
       window.removeEventListener('keydown', handleUnmuteGesture);
       window.removeEventListener('touchstart', handleUnmuteGesture);
     };
-  }, [activeSlot, tempVideoUrl, isSpeaking]);
+  }, [activeSlot, isAudioMuted]);
 
   // YouTube technology 5: Shared Hardware-Accelerated Video Media Core
   const renderAvatarMediaCore = () => (
@@ -2247,30 +2363,20 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
           preload="auto"
           autoPlay
           loop={videoSettings.loop !== false && !tempVideoUrl}
-          muted={isAudioMuted || (!isSpeaking && !tempVideoUrl)}
+          muted={isAudioMuted}
           playsInline
           webkit-playsinline="true"
           x5-playsinline="true"
           x5-video-player-type="h5"
           disablePictureInPicture
           controls={false}
-          onLoadedMetadata={(e) => {
-            const v = e.currentTarget;
-            v.play().catch(() => {
-              v.muted = true;
-              v.play().catch(() => {});
-            });
+          onLoadedMetadata={() => {
             if (slotASrc) handleSlotReadyToDisplay('A');
           }}
           onLoadedData={() => {
             if (slotASrc) handleSlotReadyToDisplay('A');
           }}
-          onCanPlay={(e) => {
-            const v = e.currentTarget;
-            v.play().catch(() => {
-              v.muted = true;
-              v.play().catch(() => {});
-            });
+          onCanPlay={() => {
             if (slotASrc) handleSlotReadyToDisplay('A');
           }}
           onPlaying={() => {
@@ -2307,30 +2413,20 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
           preload="auto"
           autoPlay
           loop={videoSettings.loop !== false && !tempVideoUrl}
-          muted={isAudioMuted || (!isSpeaking && !tempVideoUrl)}
+          muted={isAudioMuted}
           playsInline
           webkit-playsinline="true"
           x5-playsinline="true"
           x5-video-player-type="h5"
           disablePictureInPicture
           controls={false}
-          onLoadedMetadata={(e) => {
-            const v = e.currentTarget;
-            v.play().catch(() => {
-              v.muted = true;
-              v.play().catch(() => {});
-            });
+          onLoadedMetadata={() => {
             if (slotBSrc) handleSlotReadyToDisplay('B');
           }}
           onLoadedData={() => {
             if (slotBSrc) handleSlotReadyToDisplay('B');
           }}
-          onCanPlay={(e) => {
-            const v = e.currentTarget;
-            v.play().catch(() => {
-              v.muted = true;
-              v.play().catch(() => {});
-            });
+          onCanPlay={() => {
             if (slotBSrc) handleSlotReadyToDisplay('B');
           }}
           onPlaying={() => {
@@ -2388,6 +2484,18 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
             )}
             {renderAvatarMediaCore()}
 
+            {/* Audio Toggle Button in Fullscreen mode */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleVideoClick();
+              }}
+              className="absolute bottom-3 left-3 sm:bottom-4 sm:left-4 p-2 bg-white/90 hover:bg-white text-slate-700 rounded-full shadow-lg border border-slate-200 z-40 transition-all hover:scale-110 active:scale-95 cursor-pointer"
+              title={isAudioMuted ? "Activar Audio del Avatar" : "Silenciar Audio del Avatar"}
+            >
+              {isAudioMuted ? <VolumeX size={15} className="text-red-500" /> : <Volume2 size={15} className="text-emerald-600" />}
+            </button>
+
             {/* Minimize button overlay on avatar circle bottom right corner */}
             <button
               onClick={(e) => {
@@ -2410,6 +2518,18 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
     <div className="relative flex flex-col items-center justify-center select-none">
       
       <div className="relative flex flex-col items-center">
+        {/* Audio Mute/Unmute Toggle Button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            handleVideoClick();
+          }}
+          className="absolute -top-3 -left-3 p-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-full shadow-lg z-30 transition-all hover:scale-110 active:scale-95 cursor-pointer"
+          title={isAudioMuted ? "Activar Sonido del Avatar" : "Silenciar Sonido"}
+        >
+          {isAudioMuted ? <VolumeX size={15} className="text-red-500" /> : <Volume2 size={15} className="text-emerald-600" />}
+        </button>
+
         {/* Fullscreen Button shown on top right of the normal Avatar capsule container layout */}
         <button
           onClick={(e) => {
