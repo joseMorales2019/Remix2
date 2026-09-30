@@ -402,7 +402,7 @@ async function startServer() {
   app.get("/api/video-status/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const { username } = req.query; // Add username parameter
+      const { username, avatarId } = req.query as { username?: string; avatarId?: string }; // Add avatarId & username parameter
       const key = process.env.XAI_API_KEY;
 
       if (id.startsWith("mock_grok_")) {
@@ -453,7 +453,9 @@ async function startServer() {
         const rawVideoUrl = data.video?.url || null;
         let savedSupabaseUrl = rawVideoUrl;
         if (rawVideoUrl) {
-          const fileName = `grok-avatar-poll-${id}-${Date.now()}.mp4`;
+          const fileName = avatarId 
+            ? `grok-avatar-${avatarId}-${Date.now()}.mp4` 
+            : `grok-avatar-poll-${id}-${Date.now()}.mp4`;
           savedSupabaseUrl = await uploadVideoToSupabase(rawVideoUrl, fileName);
         }
         

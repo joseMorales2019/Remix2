@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../supabase';
-import { Play, RotateCcw, Volume2, VolumeX, Shuffle, Zap, Terminal, Send, Maximize2, Minimize2, Mic, MicOff, Plus, Trash2, Check, Copy, Sparkles, CheckCircle } from 'lucide-react';
+import { Play, RotateCcw, Volume2, VolumeX, Shuffle, Zap, Terminal, Send, Maximize2, Minimize2, Mic, MicOff, Plus, Trash2, Check, Copy, Sparkles, CheckCircle, X, Film, ExternalLink } from 'lucide-react';
 
 const getApiUrl = (path: string): string => {
   if (path.startsWith("http://") || path.startsWith("https://")) {
@@ -1814,12 +1814,15 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
         const videoPrompt = `Asesor virtual o representante oficial de NewBank. El personaje principal de la imagen responde de forma natural y conversacional, diciendo: "${respuestaGenerada}". Debe mantener movimientos corporales realistas, sincronizar expresiones faciales con el contenido de la respuesta, mirar hacia la cámara como si estuviera interactuando directamente con el usuario, utilizar un tono profesional, amigable y persuasivo en español de El Salvador.`;
 
         const activeImg = config.initial_image_url || config.image_url || DEFAULT_AVATAR_IMAGE;
+        const currentAvatarId = config.id || null;
+
         const initRes = await fetch(getApiUrl("/api/video-start"), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ 
             imageUrl: activeImg,
-            prompt: videoPrompt
+            prompt: videoPrompt,
+            avatarId: currentAvatarId
           })
         });
 
@@ -1839,7 +1842,10 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
         // Start Fast Polling (1200ms) for instant pickup as soon as video is ready
         const pollInterval = setInterval(async () => {
           try {
-            const statusRes = await fetch(getApiUrl(`/api/video-status/${generationId}`));
+            const statusUrl = currentAvatarId 
+              ? `/api/video-status/${generationId}?avatarId=${currentAvatarId}`
+              : `/api/video-status/${generationId}`;
+            const statusRes = await fetch(getApiUrl(statusUrl));
             if (!statusRes.ok) {
               throw new Error("Error consultando estado del video.");
             }
@@ -1886,25 +1892,34 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
               setConfig(updatedConfig);
               saveStoredConfig(updatedConfig);
 
-              // Auto-sync action and triggers for this new video directly to the Supabase database
+              // Auto-sync action and triggers specifically to this avatar's row in Supabase database
               try {
-                const { data: existing } = await supabase.from('avatar_configs').select('id').limit(1).single();
-                await supabase.from('avatar_configs').upsert({
-                  id: existing?.id || (updatedConfig.id || crypto.randomUUID()),
-                  prompt: updatedConfig.prompt,
-                  image_url: updatedConfig.image_url,
-                  show_after_greeting: updatedConfig.show_after_greeting,
-                  show_on_home: updatedConfig.show_on_home,
-                  trigger_keywords: updatedConfig.trigger_keywords,
-                  selected_personality: updatedConfig.selected_personality,
-                  selected_behavior: updatedConfig.selected_behavior,
-                  permanent_animation_prompt: updatedConfig.permanent_animation_prompt,
-                  video_emotions: updatedConfig.video_emotions,
-                  video_settings: updatedConfig.video_settings,
-                  video_triggers: updatedConfig.video_triggers,
-                  is_tiktoker_mode_enabled: updatedConfig.is_tiktoker_mode_enabled,
-                  video_url: statusData.video_url // Set newly created video as active
-                });
+                if (currentAvatarId) {
+                  await supabase.from('avatar_configs').update({
+                    video_url: statusData.video_url,
+                    video_emotions: newEmotions,
+                    video_triggers: newTriggers
+                  }).eq('id', currentAvatarId);
+                } else {
+                  const { data: existing } = await supabase.from('avatar_configs').select('id').limit(1).maybeSingle();
+                  const targetId = existing?.id || (updatedConfig.id || crypto.randomUUID());
+                  await supabase.from('avatar_configs').upsert({
+                    id: targetId,
+                    prompt: updatedConfig.prompt,
+                    image_url: updatedConfig.image_url,
+                    show_after_greeting: updatedConfig.show_after_greeting,
+                    show_on_home: updatedConfig.show_on_home,
+                    trigger_keywords: updatedConfig.trigger_keywords,
+                    selected_personality: updatedConfig.selected_personality,
+                    selected_behavior: updatedConfig.selected_behavior,
+                    permanent_animation_prompt: updatedConfig.permanent_animation_prompt,
+                    video_emotions: updatedConfig.video_emotions,
+                    video_settings: updatedConfig.video_settings,
+                    video_triggers: updatedConfig.video_triggers,
+                    is_tiktoker_mode_enabled: updatedConfig.is_tiktoker_mode_enabled,
+                    video_url: statusData.video_url
+                  });
+                }
               } catch (dbErr) {
                 console.warn("Could not save new generated video triggers/emotions to DB:", dbErr);
               }
@@ -2632,6 +2647,28 @@ export const AvataresAdminPanel: React.FC<{ user: any }> = ({ user }) => {
   const [isFallbackActive, setIsFallbackActive] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [storedVideos, setStoredVideos] = useState<{name: string, url: string, created_at: string}[]>([]);
+  const [previewModalVideo, setPreviewModalVideo] = useState<{name: string, url: string, created_at?: string} | null>(null);
+  const [copiedUrl, setCopiedUrl] = useState(false);
+  const [showAllStorageVideos, setShowAllStorageVideos] = useState(false);
+
+  // Videos corresponding exclusively to the selected avatar
+  const avatarVideos = useMemo(() => {
+    if (!selectedAvatar) return [];
+    return storedVideos.filter(video => {
+      if (selectedAvatar.video_url === video.url || selectedAvatar.video_url?.includes(video.name)) return true;
+      if (selectedAvatar.video_triggers && Object.prototype.hasOwnProperty.call(selectedAvatar.video_triggers, video.name)) return true;
+      if (selectedAvatar.video_emotions && Object.prototype.hasOwnProperty.call(selectedAvatar.video_emotions, video.name)) return true;
+      if (selectedAvatar.video_settings && Object.prototype.hasOwnProperty.call(selectedAvatar.video_settings, video.name)) return true;
+      if (selectedAvatar.id) {
+        const cleanId = selectedAvatar.id.replace(/-/g, '');
+        const shortId = selectedAvatar.id.substring(0, 8);
+        if (video.name.includes(selectedAvatar.id) || video.name.includes(cleanId) || video.name.includes(shortId)) return true;
+      }
+      return false;
+    });
+  }, [selectedAvatar, storedVideos]);
+
+  const displayedVideos = showAllStorageVideos ? storedVideos : avatarVideos;
   
   // Scenarios preview states
   const [previewScenario, setPreviewScenario] = useState<'greeting' | 'interaction' | 'scanner'>('interaction');
@@ -3601,24 +3638,62 @@ export const AvataresAdminPanel: React.FC<{ user: any }> = ({ user }) => {
 
               {/* STORES VIDEOS GALLERY CONFIG FOR THIS AVATAR */}
               <div className="pt-6 border-t border-slate-100">
-                <span className="block text-[10px] font-black uppercase tracking-wide text-slate-400 mb-3 px-1">
-                  🎥 Asignar Videos Almacenados y Disparadores Emocionales
-                </span>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 px-1">
+                  <div>
+                    <span className="block text-[10px] font-black uppercase tracking-wide text-slate-700">
+                      🎥 Videos del Avatar ({displayedVideos.length})
+                    </span>
+                    <p className="text-[9px] text-slate-400 font-medium">
+                      {showAllStorageVideos 
+                        ? "Mostrando todos los videos en almacenamiento para vincular a este avatar."
+                        : "Mostrando únicamente los videos vinculados a este avatar."}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowAllStorageVideos(!showAllStorageVideos)}
+                      className="px-2.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-wider bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
+                    >
+                      {showAllStorageVideos ? "Mostrar solo videos del Avatar" : `Explorar todos los videos (${storedVideos.length})`}
+                    </button>
+                  </div>
+                </div>
                 
-                {storedVideos.length > 0 ? (
+                {displayedVideos.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[350px] overflow-y-auto p-1 bg-slate-50/50 rounded-2xl border border-slate-100 custom-scrollbar">
-                    {storedVideos.map((video, idx) => {
+                    {displayedVideos.map((video, idx) => {
                       const isAssigned = selectedAvatar.video_url === video.url;
                       return (
-                        <div key={idx} className="bg-white rounded-xl border border-slate-200/60 p-3 shadow-sm hover:shadow-md transition flex items-start gap-3">
-                          <div className="w-20 aspect-video rounded-lg overflow-hidden bg-slate-900 flex-shrink-0 relative">
-                            <video src={video.url} muted loop className="w-full h-full object-cover" onMouseEnter={e => (e.target as HTMLVideoElement).play().catch(() => {})} onMouseLeave={e => { (e.target as HTMLVideoElement).pause(); }} />
+                        <div 
+                          key={idx} 
+                          onClick={() => setPreviewModalVideo(video)}
+                          className={`bg-white rounded-xl border p-3 shadow-sm hover:shadow-md transition flex items-start gap-3 cursor-pointer group relative ${
+                            isAssigned ? 'border-blue-300 ring-1 ring-blue-400/30' : 'border-slate-200/60 hover:border-blue-200'
+                          }`}
+                        >
+                          <div className="w-20 aspect-video rounded-lg overflow-hidden bg-slate-900 flex-shrink-0 relative group/thumb">
+                            <video 
+                              src={video.url} 
+                              muted 
+                              loop 
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+                              onMouseEnter={e => (e.target as HTMLVideoElement).play().catch(() => {})} 
+                              onMouseLeave={e => { (e.target as HTMLVideoElement).pause(); }} 
+                            />
+                            <div className="absolute inset-0 bg-black/25 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                              <span className="p-1 bg-white/90 text-slate-900 rounded-full text-[10px] shadow">▶</span>
+                            </div>
                           </div>
                           
                           <div className="flex-grow min-w-0 space-y-1">
-                            <p className="text-[9px] font-black text-slate-800 truncate mb-1" title={video.name}>{video.name}</p>
+                            <div className="flex items-center justify-between gap-1">
+                              <p className="text-[9px] font-black text-slate-800 truncate" title={video.name}>{video.name}</p>
+                              <span className="text-[8px] text-blue-600 font-bold opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                                👁️ Abrir
+                              </span>
+                            </div>
                             
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
                               <button
                                 onClick={async () => {
                                   const updated = { ...selectedAvatar, video_url: video.url };
@@ -3627,7 +3702,7 @@ export const AvataresAdminPanel: React.FC<{ user: any }> = ({ user }) => {
                                   setSuccessMsg("Video principal del avatar asignado.");
                                   setTimeout(() => setSuccessMsg(""), 3000);
                                 }}
-                                className={`px-2 py-1 rounded text-[8px] font-black uppercase tracking-wider transition ${
+                                className={`px-2 py-1 rounded text-[8px] font-black uppercase tracking-wider transition cursor-pointer ${
                                   isAssigned 
                                     ? 'bg-blue-600 text-white' 
                                     : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -3635,11 +3710,18 @@ export const AvataresAdminPanel: React.FC<{ user: any }> = ({ user }) => {
                               >
                                 {isAssigned ? "✔️ Asignado" : "Asignar Base"}
                               </button>
+
+                              <button
+                                onClick={() => setPreviewModalVideo(video)}
+                                className="px-2 py-1 rounded text-[8px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 uppercase tracking-wider transition cursor-pointer"
+                              >
+                                Ver Detalle
+                              </button>
                             </div>
 
                             <div className="pt-2 flex flex-col gap-1.5" onClick={e => e.stopPropagation()}>
                               <div className="flex items-center gap-1">
-                                <span className="text-[8px] font-bold text-slate-400 uppercase font-bold">Tríger:</span>
+                                <span className="text-[8px] font-bold text-slate-400 uppercase">Tríger:</span>
                                 <input
                                   type="text"
                                   value={selectedAvatar.video_triggers?.[video.name] || ""}
@@ -3654,7 +3736,7 @@ export const AvataresAdminPanel: React.FC<{ user: any }> = ({ user }) => {
                                 />
                               </div>
                               <div className="flex items-center gap-1">
-                                <span className="text-[8px] font-bold text-slate-400 uppercase font-bold">Emoción:</span>
+                                <span className="text-[8px] font-bold text-slate-400 uppercase">Emoción:</span>
                                 <input
                                   type="text"
                                   value={selectedAvatar.video_emotions?.[video.name] || ""}
@@ -3675,7 +3757,20 @@ export const AvataresAdminPanel: React.FC<{ user: any }> = ({ user }) => {
                     })}
                   </div>
                 ) : (
-                  <p className="text-[9px] text-slate-400 font-bold mt-1 uppercase">No hay videos en el bucket / storage.</p>
+                  <div className="p-6 bg-slate-50/50 rounded-2xl border border-dashed border-slate-200 text-center space-y-2">
+                    <p className="text-[10px] text-slate-500 font-bold uppercase">
+                      Este avatar aún no tiene videos vinculados.
+                    </p>
+                    <p className="text-[9px] text-slate-400 max-w-md mx-auto font-medium">
+                      Genera una animación con Grok arriba o pulsa "Explorar todos los videos" para vincular un video almacenado a este avatar.
+                    </p>
+                    <button
+                      onClick={() => setShowAllStorageVideos(true)}
+                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-[9px] font-black uppercase tracking-wider transition cursor-pointer font-bold"
+                    >
+                      Explorar todos los videos ({storedVideos.length})
+                    </button>
+                  </div>
                 )}
               </div>
 
@@ -3694,6 +3789,221 @@ export const AvataresAdminPanel: React.FC<{ user: any }> = ({ user }) => {
         </div>
 
       </div>
+
+      {/* MODAL: Vista en primer plano del Video con Controles Completos e Información */}
+      {previewModalVideo && (
+        <div 
+          className="fixed inset-0 z-[99999] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto animate-fadeIn"
+          onClick={() => setPreviewModalVideo(null)}
+        >
+          <div 
+            className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-3xl w-full overflow-hidden flex flex-col my-auto max-h-[95vh]"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50/80">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                  <Film size={18} />
+                </div>
+                <div className="min-w-0">
+                  <h4 className="text-xs sm:text-sm font-black text-slate-800 uppercase tracking-tight truncate">
+                    {previewModalVideo.name}
+                  </h4>
+                  <p className="text-[10px] text-slate-400 font-medium truncate">
+                    Reproducción, información y disparadores del video
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setPreviewModalVideo(null)}
+                className="p-1.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition cursor-pointer shrink-0"
+                title="Cerrar ventana"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 overflow-y-auto space-y-5 custom-scrollbar">
+              {/* Video Player with full controls */}
+              <div className="relative w-full aspect-video rounded-2xl bg-black overflow-hidden shadow-inner flex items-center justify-center border border-slate-800">
+                <video
+                  src={previewModalVideo.url}
+                  controls
+                  autoPlay
+                  loop
+                  playsInline
+                  className="w-full h-full object-contain"
+                />
+              </div>
+
+              {/* Status and Base Assignment */}
+              {selectedAvatar && (
+                <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-slate-50 rounded-2xl border border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black uppercase text-slate-400">Estado:</span>
+                    {selectedAvatar.video_url === previewModalVideo.url ? (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-100 text-emerald-700 rounded-full text-[9px] font-black uppercase tracking-wider">
+                        <Check size={12} /> Video Base Activo
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-200 text-slate-600 rounded-full text-[9px] font-bold uppercase tracking-wider">
+                        Disponible
+                      </span>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={async () => {
+                      const updated = { ...selectedAvatar, video_url: previewModalVideo.url };
+                      setSelectedAvatar(updated);
+                      await supabase.from('avatar_configs').update({ video_url: previewModalVideo.url }).eq('id', selectedAvatar.id!);
+                      setSuccessMsg("Video principal del avatar asignado.");
+                      setTimeout(() => setSuccessMsg(""), 3000);
+                    }}
+                    className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-wider transition active:scale-95 shadow-sm font-bold cursor-pointer ${
+                      selectedAvatar.video_url === previewModalVideo.url
+                        ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                    }`}
+                  >
+                    {selectedAvatar.video_url === previewModalVideo.url ? "✔️ Asignado como Base" : "🎬 Asignar como Video Base"}
+                  </button>
+                </div>
+              )}
+
+              {/* Information & Fields */}
+              {selectedAvatar && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Tríger / Disparador Input */}
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-1.5">
+                    <label className="block text-[10px] font-black uppercase text-slate-700 tracking-wider">
+                      🎯 Tríger / Disparador de Preguntas:
+                    </label>
+                    <p className="text-[9px] text-slate-400 font-medium">
+                      Palabras clave separadas por comas que activan este video cuando el usuario interactúa o pregunta.
+                    </p>
+                    <input
+                      type="text"
+                      value={selectedAvatar.video_triggers?.[previewModalVideo.name] || ""}
+                      onChange={async (e) => {
+                        const newTrigs = { ...(selectedAvatar.video_triggers || {}), [previewModalVideo.name]: e.target.value };
+                        const updated = { ...selectedAvatar, video_triggers: newTrigs };
+                        setSelectedAvatar(updated);
+                        await supabase.from('avatar_configs').update({ video_triggers: newTrigs }).eq('id', selectedAvatar.id!);
+                      }}
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white text-slate-800"
+                      placeholder="ej. hola, precios, créditos, whatsapp..."
+                    />
+                  </div>
+
+                  {/* Emoción / Locución Input */}
+                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-1.5">
+                    <label className="block text-[10px] font-black uppercase text-slate-700 tracking-wider">
+                      💬 Emoción / Locución de Respuesta:
+                    </label>
+                    <p className="text-[9px] text-slate-400 font-medium">
+                      Texto o respuesta que el avatar pronuncia o expresa al activarse este video.
+                    </p>
+                    <input
+                      type="text"
+                      value={selectedAvatar.video_emotions?.[previewModalVideo.name] || ""}
+                      onChange={async (e) => {
+                        const newEmots = { ...(selectedAvatar.video_emotions || {}), [previewModalVideo.name]: e.target.value };
+                        const updated = { ...selectedAvatar, video_emotions: newEmots };
+                        setSelectedAvatar(updated);
+                        await supabase.from('avatar_configs').update({ video_emotions: newEmots }).eq('id', selectedAvatar.id!);
+                      }}
+                      className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 font-bold bg-white text-slate-800"
+                      placeholder="ej. ¡Hola! En NewBank te damos tu crédito en 5 minutos..."
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Video Settings: Loop & Mute at end */}
+              {selectedAvatar && (
+                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-3">
+                  <span className="block text-[10px] font-black uppercase text-slate-700 tracking-wider">
+                    ⚙️ Ajustes de Reproducción del Video:
+                  </span>
+                  <div className="flex flex-wrap items-center gap-6">
+                    <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={selectedAvatar.video_settings?.[previewModalVideo.name]?.loop !== false}
+                        onChange={async (e) => {
+                          const currentSettings = selectedAvatar.video_settings || {};
+                          const videoSetting = currentSettings[previewModalVideo.name] || { loop: true, mute_at_end: false };
+                          const newSettings = {
+                            ...currentSettings,
+                            [previewModalVideo.name]: { ...videoSetting, loop: e.target.checked }
+                          };
+                          const updated = { ...selectedAvatar, video_settings: newSettings };
+                          setSelectedAvatar(updated);
+                          await supabase.from('avatar_configs').update({ video_settings: newSettings }).eq('id', selectedAvatar.id!);
+                        }}
+                        className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                      />
+                      <span>Reproducir en Bucle Continuo (Loop)</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700">
+                      <input
+                        type="checkbox"
+                        checked={selectedAvatar.video_settings?.[previewModalVideo.name]?.mute_at_end === true}
+                        onChange={async (e) => {
+                          const currentSettings = selectedAvatar.video_settings || {};
+                          const videoSetting = currentSettings[previewModalVideo.name] || { loop: true, mute_at_end: false };
+                          const newSettings = {
+                            ...currentSettings,
+                            [previewModalVideo.name]: { ...videoSetting, mute_at_end: e.target.checked }
+                          };
+                          const updated = { ...selectedAvatar, video_settings: newSettings };
+                          setSelectedAvatar(updated);
+                          await supabase.from('avatar_configs').update({ video_settings: newSettings }).eq('id', selectedAvatar.id!);
+                        }}
+                        className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
+                      />
+                      <span>Silenciar audio al terminar</span>
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {/* Video Link */}
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <span className="block text-[8px] font-black uppercase text-slate-400">URL del Video en Supabase Storage:</span>
+                  <p className="text-[10px] font-mono text-slate-600 truncate">{previewModalVideo.url}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(previewModalVideo.url);
+                    setCopiedUrl(true);
+                    setTimeout(() => setCopiedUrl(false), 2000);
+                  }}
+                  className="px-3 py-1.5 bg-white border border-slate-200 text-slate-700 rounded-lg text-[9px] font-black uppercase tracking-wider hover:bg-slate-100 transition shrink-0 flex items-center gap-1 font-bold cursor-pointer"
+                >
+                  {copiedUrl ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                  {copiedUrl ? "Copiado" : "Copiar URL"}
+                </button>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="px-5 py-3.5 border-t border-slate-100 bg-slate-50/80 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setPreviewModalVideo(null)}
+                className="px-5 py-2.5 bg-slate-900 hover:bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-wider transition active:scale-95 font-bold cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
