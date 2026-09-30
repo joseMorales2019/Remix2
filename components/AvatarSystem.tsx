@@ -1762,6 +1762,15 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
     if (bestMatchVideo) {
       console.log(`Manual trigger match found: ${bestMatchVideo}`);
       const videoUrl = `https://stqthrzbvuqcavtsonba.supabase.co/storage/v1/object/public/newbankVideoAnimadoAvatar/${bestMatchVideo}`;
+      
+      // Proactive media pre-buffering (YouTube video technology)
+      try {
+        const preloader = document.createElement('video');
+        preloader.preload = 'auto';
+        preloader.src = videoUrl;
+        preloader.load();
+      } catch (e) {}
+
       setTempVideoUrl(videoUrl);
       const updatedConfig = { ...config, video_url: videoUrl };
       setConfig(updatedConfig);
@@ -1822,7 +1831,7 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
         setGenerationProgress(50);
         setGenerationText("Modelando gestos y renderizando video...");
 
-        // Start Polling
+        // Start Fast Polling (1200ms) for instant pickup as soon as video is ready
         const pollInterval = setInterval(async () => {
           try {
             const statusRes = await fetch(getApiUrl(`/api/video-status/${generationId}`));
@@ -1840,7 +1849,15 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
               setGenerationProgress(100);
               setGenerationText("¡Video generado exitosamente!");
 
-              // Dynamically play this video automatically & immediately without losing standby video config
+              // Proactive media pre-buffering (YouTube video technology)
+              try {
+                const preloader = document.createElement('video');
+                preloader.preload = 'auto';
+                preloader.src = statusData.video_url;
+                preloader.load();
+              } catch (e) {}
+
+              // Dynamically play this video automatically & immediately without delay
               setTempVideoUrl(statusData.video_url);
 
               // Extract video name to map action and trigger
@@ -1884,7 +1901,7 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
 
               window.dispatchEvent(new Event('avatar-config-updated'));
 
-              // Reset question and generation state
+              // Reset question and generation state immediately so UI unblocks instantly
               setQuestion("");
               setIsGenerating(false);
             } else if (statusData.status === "in-progress") {
@@ -1899,7 +1916,7 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
               setIsGenerating(false);
             }, 3000);
           }
-        }, 3000);
+        }, 1200);
 
       } catch (err: any) {
         setGenerationProgress(0);
@@ -1916,30 +1933,6 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
     checkIndicator();
     window.addEventListener('avatar-config-updated', checkIndicator);
     return () => window.removeEventListener('avatar-config-updated', checkIndicator);
-  }, []);
-
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  // Moved video autoplay logic closer to the dynamic finalVideoSource definition below to trigger play on active video transition or initialization.
-
-  // Unmute and play audio as soon as a user interacts with the app (Requirement 3 bypass)
-  useEffect(() => {
-    const handleUnmuteGesture = () => {
-      if (videoRef.current && videoRef.current.muted) {
-        videoRef.current.muted = false;
-        videoRef.current.play().catch(e => {
-          if (videoRef.current?.src) {
-            console.warn("Failed play on user interaction:", e);
-          }
-        });
-      }
-    };
-    window.addEventListener('click', handleUnmuteGesture);
-    window.addEventListener('keydown', handleUnmuteGesture);
-    return () => {
-      window.removeEventListener('click', handleUnmuteGesture);
-      window.removeEventListener('keydown', handleUnmuteGesture);
-    };
   }, []);
 
   // 1. Trigger proactive async fetch from Supabase to load high-fidelity generated database sequences on mount
@@ -1978,7 +1971,7 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
     : userBaseImage;
   const currentImageFromSeq = resolveImageUrl(rawImageFromSeq, config, userBaseImage);
 
-  // Crossfade and transition tracking to avoid abrupt transitions between videos
+  // Active video source resolution
   const activeSource = tempVideoUrl
     ? tempVideoUrl
     : (currentActiveVideoUrl && !(currentImageFromSeq.match(/\.(mp4|webm|ogg)$/i) || currentImageFromSeq.includes('VideoAnimadoAvatar')))
@@ -1989,141 +1982,7 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
 
   const finalVideoSource = activeSource;
 
-  // Play video automatically when speaking or active, watching the actual video source
-  useEffect(() => {
-    if (videoRef.current && finalVideoSource) {
-      const v = videoRef.current;
-      v.muted = !isSpeaking;
-      v.currentTime = 0;
-      const playPromise = v.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          console.log("Autoplay with audio deferred by browser protection. Playing muted first.", error);
-          if (videoRef.current) {
-            videoRef.current.muted = true;
-            videoRef.current.play().catch(e => {
-              if (videoRef.current?.src) {
-                console.warn("Failed muted play:", e);
-              }
-            });
-          }
-        });
-      }
-    }
-  }, [finalVideoSource, isSpeaking]);
-
-  const [transitionState, setTransitionState] = useState<{
-    prevUrl: string | null;
-    currentUrl: string | null;
-    prevTime: number;
-    transitionActive: boolean;
-    transitionKey: number;
-  }>({
-    prevUrl: null,
-    currentUrl: finalVideoSource || null,
-    prevTime: 0,
-    transitionActive: false,
-    transitionKey: 0,
-  });
-
-  const transitionTimersRef = useRef<{ trigger: NodeJS.Timeout | null; clean: NodeJS.Timeout | null }>({
-    trigger: null,
-    clean: null,
-  });
-
-  const triggerCrossfade = (prev: string | null, current: string | null) => {
-    if (transitionTimersRef.current.trigger) clearTimeout(transitionTimersRef.current.trigger);
-    if (transitionTimersRef.current.clean) clearTimeout(transitionTimersRef.current.clean);
-
-    const capturedTime = videoRef.current ? videoRef.current.currentTime : 0;
-
-    setTransitionState(old => ({
-      prevUrl: prev,
-      currentUrl: current,
-      prevTime: capturedTime,
-      transitionActive: false,
-      transitionKey: old.transitionKey + 1,
-    }));
-
-    const trigger = setTimeout(() => {
-      setTransitionState(prev => ({
-        ...prev,
-        transitionActive: true
-      }));
-    }, 50);
-
-    const clean = setTimeout(() => {
-      setTransitionState(prev => ({
-        ...prev,
-        prevUrl: null,
-        transitionActive: false,
-      }));
-    }, 1600);
-
-    transitionTimersRef.current = { trigger, clean };
-  };
-
-  useEffect(() => {
-    return () => {
-      if (transitionTimersRef.current.trigger) clearTimeout(transitionTimersRef.current.trigger);
-      if (transitionTimersRef.current.clean) clearTimeout(transitionTimersRef.current.clean);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (finalVideoSource) {
-      if (transitionState.currentUrl && transitionState.currentUrl !== finalVideoSource) {
-        triggerCrossfade(transitionState.currentUrl, finalVideoSource);
-      } else if (!transitionState.currentUrl) {
-        setTransitionState(prev => ({
-          ...prev,
-          currentUrl: finalVideoSource,
-          transitionActive: false,
-          transitionKey: prev.transitionKey,
-        }));
-      }
-    } else {
-      if (transitionState.currentUrl) {
-        triggerCrossfade(transitionState.currentUrl, null);
-      }
-    }
-  }, [finalVideoSource]);
-
-  const currentOpacityClass = transitionState.prevUrl
-    ? (transitionState.transitionActive ? "opacity-100" : "opacity-0")
-    : "opacity-100";
-
-  const handleVideoEnded = (videoUrl: string, e: React.SyntheticEvent<HTMLVideoElement>) => {
-    if (videoSettings.mute_at_end && videoRef.current) {
-      videoRef.current.muted = true;
-    }
-    window.dispatchEvent(new CustomEvent('avatar-video-ended', { 
-      detail: { videoUrl } 
-    }));
-
-    if (tempVideoUrl && videoUrl === tempVideoUrl) {
-      setTempVideoUrl(null);
-      return;
-    }
-
-    const shouldLoop = videoSettings.loop !== false;
-
-    if (shouldLoop) {
-      const videoEl = e.currentTarget as HTMLVideoElement;
-      setTimeout(() => {
-        if (videoEl && videoEl.isConnected && videoEl.src.includes(videoUrl)) {
-          console.log("Repetir video con transición cruzada dissolve:", videoUrl);
-          triggerCrossfade(videoUrl, videoUrl);
-          videoEl.currentTime = 0;
-          videoEl.play().catch(err => {
-            console.warn("Falla en reproducción de bucle con transición cruzada:", err);
-          });
-        }
-      }, 50);
-    }
-  };
-
-  // Frame timer for speaker mouth/glow oscillations (loops over precisely 5 photograms for the requested action transition)
+  // Frame timer for speaker mouth/glow oscillations (loops over precisely 5 photograms)
   useEffect(() => {
     if (!isSpeaking) {
       setFrameIndex(0);
@@ -2131,7 +1990,7 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
     }
     const interval = setInterval(() => {
       setFrameIndex(prev => (prev + 1) % 5);
-    }, 450); // Fluid cinematic pacing for the 5-frame loop
+    }, 450);
     return () => clearInterval(interval);
   }, [isSpeaking]);
 
@@ -2144,15 +2003,10 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
 
   // High-fidelity camera motion effects mapped directly to the 5 photograms
   const cameraTransforms = [
-    // Fotograma 1: Enfoque de inicio, hombros neutros, encuadre estándar estable
     { transform: "scale(1.04) translate(0px, 0px) rotate(0deg)" },
-    // Fotograma 2: Zoom hacia delante (Dolly), paneo sutil hacia la izquierda, inclinación de cabeza
     { transform: "scale(1.08) translate(-1.5px, -1px) rotate(-1deg)" },
-    // Fotograma 3: Traslación ascendente de cámara para articular el torso y la gesticulación de manos
     { transform: "scale(1.12) translate(1px, -3px) rotate(0.8deg)" },
-    // Fotograma 4: Desplazamiento sutil de paneo a la derecha con suavizado cinemático
     { transform: "scale(1.09) translate(2.5px, -2px) rotate(-0.5deg)" },
-    // Fotograma 5: Clímax de aproximación enfocada en los gestos expresivos y asentimiento
     { transform: "scale(1.15) translate(0px, -4.5px) rotate(1.4deg)" }
   ];
 
@@ -2160,7 +2014,7 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
     ? cameraTransforms[frameIndex % 5] 
     : { transform: "scale(1.04) translate(0px, 0px) rotate(0deg)" };
 
-  // Lighting matrices matching each photogram to create high quality facial luminosity matching
+  // Lighting matrices matching each photogram to create high quality facial luminosity
   const filterPresets = [
     "contrast(102%) saturate(106%) brightness(100%) hue-rotate(2deg)",
     "contrast(106%) saturate(112%) brightness(102%) hue-rotate(4deg) drop-shadow(0 2px 8px rgba(59,130,246,0.15))",
@@ -2169,6 +2023,330 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
     "contrast(112%) saturate(122%) brightness(105%) hue-rotate(8deg) drop-shadow(0 5px 16px rgba(59,130,246,0.35))"
   ];
   const activeFilter = isSpeaking ? filterPresets[frameIndex % 5] : "contrast(102%) saturate(105%) brightness(100%)";
+
+  // YouTube technology 1: Background Pre-buffering
+  useEffect(() => {
+    try {
+      if (config.video_url) {
+        const p = document.createElement('video');
+        p.preload = 'auto';
+        p.src = config.video_url;
+        p.load();
+      }
+      if (config.video_triggers) {
+        Object.keys(config.video_triggers).slice(0, 5).forEach(vName => {
+          const u = `https://stqthrzbvuqcavtsonba.supabase.co/storage/v1/object/public/newbankVideoAnimadoAvatar/${vName}`;
+          const p = document.createElement('video');
+          p.preload = 'auto';
+          p.src = u;
+          p.load();
+        });
+      }
+    } catch (e) {}
+  }, [config.video_url, config.video_triggers]);
+
+  // Guaranteed safe underlay photo that NEVER loads an MP4 and never stays blank
+  const isVideoUrl = (u?: string) => Boolean(u && (u.match(/\.(mp4|webm|ogg)$/i) || u.includes('VideoAnimadoAvatar')));
+  const safeUnderlayImage = (() => {
+    if (userBaseImage && !isVideoUrl(userBaseImage)) return userBaseImage;
+    if (config.image_url && !isVideoUrl(config.image_url)) return config.image_url;
+    if (config.initial_image_url && !isVideoUrl(config.initial_image_url)) return config.initial_image_url;
+    return DEFAULT_AVATAR_IMAGE;
+  })();
+
+  // YouTube technology 2: Dual-Buffer Video Engine with Zero-Latency Swap
+  const [activeSlot, setActiveSlot] = useState<'A' | 'B'>('A');
+  const [slotASrc, setSlotASrc] = useState<string | null>(finalVideoSource);
+  const [slotBSrc, setSlotBSrc] = useState<string | null>(null);
+  const [slotAVisible, setSlotAVisible] = useState<boolean>(Boolean(finalVideoSource));
+  const [slotBVisible, setSlotBVisible] = useState<boolean>(false);
+  const [isAudioMuted, setIsAudioMuted] = useState<boolean>(false);
+
+  const videoRefA = useRef<HTMLVideoElement>(null);
+  const videoRefB = useRef<HTMLVideoElement>(null);
+
+  // Synchronize incoming video into inactive slot and trigger instant buffer & playback
+  useEffect(() => {
+    if (!finalVideoSource) {
+      setSlotAVisible(false);
+      setSlotBVisible(false);
+      return;
+    }
+
+    const wantSound = Boolean(tempVideoUrl) || isSpeaking;
+
+    if (activeSlot === 'A') {
+      if (slotASrc === finalVideoSource) {
+        setSlotAVisible(true);
+        if (videoRefA.current) {
+          const v = videoRefA.current;
+          v.muted = isAudioMuted || !wantSound;
+          v.play().catch(() => {
+            v.muted = true;
+            v.play().catch(() => {});
+          });
+        }
+        return;
+      }
+      // Prepare incoming slot B with preloading
+      setSlotBSrc(finalVideoSource);
+      setTimeout(() => {
+        if (videoRefB.current) {
+          const v = videoRefB.current;
+          v.src = finalVideoSource;
+          v.preload = 'auto';
+          v.load();
+          v.currentTime = 0;
+          v.muted = isAudioMuted || !wantSound;
+          const p = v.play();
+          if (p) {
+            p.catch(() => {
+              v.muted = true;
+              v.play().catch(() => {});
+            });
+          }
+        }
+      }, 0);
+    } else {
+      if (slotBSrc === finalVideoSource) {
+        setSlotBVisible(true);
+        if (videoRefB.current) {
+          const v = videoRefB.current;
+          v.muted = isAudioMuted || !wantSound;
+          v.play().catch(() => {
+            v.muted = true;
+            v.play().catch(() => {});
+          });
+        }
+        return;
+      }
+      // Prepare incoming slot A with preloading
+      setSlotASrc(finalVideoSource);
+      setTimeout(() => {
+        if (videoRefA.current) {
+          const v = videoRefA.current;
+          v.src = finalVideoSource;
+          v.preload = 'auto';
+          v.load();
+          v.currentTime = 0;
+          v.muted = isAudioMuted || !wantSound;
+          const p = v.play();
+          if (p) {
+            p.catch(() => {
+              v.muted = true;
+              v.play().catch(() => {});
+            });
+          }
+        }
+      }, 0);
+    }
+  }, [finalVideoSource, isSpeaking, tempVideoUrl]);
+
+  // YouTube technology 3: Instant swap when incoming slot renders first frame
+  const handleSlotReadyToDisplay = (slot: 'A' | 'B') => {
+    if (slot === 'B') {
+      setActiveSlot('B');
+      setSlotBVisible(true);
+      setSlotAVisible(false);
+      setTimeout(() => {
+        if (videoRefA.current) {
+          videoRefA.current.pause();
+        }
+      }, 250);
+    } else {
+      setActiveSlot('A');
+      setSlotAVisible(true);
+      setSlotBVisible(false);
+      setTimeout(() => {
+        if (videoRefB.current) {
+          videoRefB.current.pause();
+        }
+      }, 250);
+    }
+  };
+
+  const handleSlotEnded = (slot: 'A' | 'B', url: string, e: React.SyntheticEvent<HTMLVideoElement>) => {
+    if (videoSettings.mute_at_end) {
+      setIsAudioMuted(true);
+    }
+    window.dispatchEvent(new CustomEvent('avatar-video-ended', { 
+      detail: { videoUrl: url } 
+    }));
+
+    if (tempVideoUrl && url === tempVideoUrl) {
+      setTempVideoUrl(null);
+      return;
+    }
+
+    const shouldLoop = videoSettings.loop !== false;
+    if (shouldLoop) {
+      const v = e.currentTarget;
+      v.currentTime = 0;
+      v.play().catch(() => {});
+    }
+  };
+
+  const handleVideoClick = () => {
+    const nextMuted = !isAudioMuted;
+    setIsAudioMuted(nextMuted);
+    if (videoRefA.current) videoRefA.current.muted = nextMuted;
+    if (videoRefB.current) videoRefB.current.muted = nextMuted;
+  };
+
+  // YouTube technology 4: Automatic user gesture audio unlock
+  useEffect(() => {
+    const handleUnmuteGesture = () => {
+      const activeRef = activeSlot === 'A' ? videoRefA.current : videoRefB.current;
+      if (activeRef && activeRef.muted && (tempVideoUrl || isSpeaking)) {
+        activeRef.muted = false;
+        activeRef.play().catch(() => {});
+      }
+    };
+    window.addEventListener('click', handleUnmuteGesture, { passive: true });
+    window.addEventListener('keydown', handleUnmuteGesture, { passive: true });
+    window.addEventListener('touchstart', handleUnmuteGesture, { passive: true });
+    return () => {
+      window.removeEventListener('click', handleUnmuteGesture);
+      window.removeEventListener('keydown', handleUnmuteGesture);
+      window.removeEventListener('touchstart', handleUnmuteGesture);
+    };
+  }, [activeSlot, tempVideoUrl, isSpeaking]);
+
+  // YouTube technology 5: Shared Hardware-Accelerated Video Media Core
+  const renderAvatarMediaCore = () => (
+    <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center relative bg-slate-900">
+      {/* Permanent safe base avatar photo underlay - NEVER blank white */}
+      <img
+        src={safeUnderlayImage}
+        alt="Smart Avatar Face"
+        onError={(e) => {
+          (e.currentTarget as HTMLImageElement).src = DEFAULT_AVATAR_IMAGE;
+        }}
+        style={{ 
+          filter: activeFilter,
+          transform: activeCameraStyle.transform,
+          willChange: "transform, opacity",
+          backfaceVisibility: "hidden"
+        }}
+        className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+        referrerPolicy="no-referrer"
+      />
+
+      {/* Dual Buffer Slot A */}
+      {slotASrc && (
+        <video
+          ref={videoRefA}
+          src={slotASrc}
+          preload="auto"
+          autoPlay
+          loop={videoSettings.loop !== false && !tempVideoUrl}
+          muted={isAudioMuted || (!isSpeaking && !tempVideoUrl)}
+          playsInline
+          webkit-playsinline="true"
+          x5-playsinline="true"
+          x5-video-player-type="h5"
+          disablePictureInPicture
+          controls={false}
+          onLoadedMetadata={(e) => {
+            const v = e.currentTarget;
+            v.play().catch(() => {
+              v.muted = true;
+              v.play().catch(() => {});
+            });
+          }}
+          onCanPlay={(e) => {
+            const v = e.currentTarget;
+            v.play().catch(() => {
+              v.muted = true;
+              v.play().catch(() => {});
+            });
+          }}
+          onPlaying={() => {
+            if (slotASrc) handleSlotReadyToDisplay('A');
+          }}
+          onTimeUpdate={() => {
+            if (slotASrc && !slotAVisible) handleSlotReadyToDisplay('A');
+          }}
+          onEnded={(e) => {
+            if (slotASrc) handleSlotEnded('A', slotASrc, e);
+          }}
+          onError={() => {
+            console.warn("Slot A video error for source:", slotASrc);
+            if (tempVideoUrl && slotASrc === tempVideoUrl) setTempVideoUrl(null);
+          }}
+          style={{ 
+            filter: activeFilter,
+            transform: activeCameraStyle.transform,
+            willChange: "transform, opacity",
+            backfaceVisibility: "hidden",
+            WebkitBackfaceVisibility: "hidden",
+            transformStyle: "preserve-3d"
+          }}
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 ease-out ${
+            slotAVisible ? "opacity-100 z-20 pointer-events-auto" : "opacity-0 z-10 pointer-events-none"
+          }`}
+          onClick={handleVideoClick}
+        />
+      )}
+
+      {/* Dual Buffer Slot B */}
+      {slotBSrc && (
+        <video
+          ref={videoRefB}
+          src={slotBSrc}
+          preload="auto"
+          autoPlay
+          loop={videoSettings.loop !== false && !tempVideoUrl}
+          muted={isAudioMuted || (!isSpeaking && !tempVideoUrl)}
+          playsInline
+          webkit-playsinline="true"
+          x5-playsinline="true"
+          x5-video-player-type="h5"
+          disablePictureInPicture
+          controls={false}
+          onLoadedMetadata={(e) => {
+            const v = e.currentTarget;
+            v.play().catch(() => {
+              v.muted = true;
+              v.play().catch(() => {});
+            });
+          }}
+          onCanPlay={(e) => {
+            const v = e.currentTarget;
+            v.play().catch(() => {
+              v.muted = true;
+              v.play().catch(() => {});
+            });
+          }}
+          onPlaying={() => {
+            if (slotBSrc) handleSlotReadyToDisplay('B');
+          }}
+          onTimeUpdate={() => {
+            if (slotBSrc && !slotBVisible) handleSlotReadyToDisplay('B');
+          }}
+          onEnded={(e) => {
+            if (slotBSrc) handleSlotEnded('B', slotBSrc, e);
+          }}
+          onError={() => {
+            console.warn("Slot B video error for source:", slotBSrc);
+            if (tempVideoUrl && slotBSrc === tempVideoUrl) setTempVideoUrl(null);
+          }}
+          style={{ 
+            filter: activeFilter,
+            transform: activeCameraStyle.transform,
+            willChange: "transform, opacity",
+            backfaceVisibility: "hidden",
+            WebkitBackfaceVisibility: "hidden",
+            transformStyle: "preserve-3d"
+          }}
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 ease-out ${
+            slotBVisible ? "opacity-100 z-20 pointer-events-auto" : "opacity-0 z-10 pointer-events-none"
+          }`}
+          onClick={handleVideoClick}
+        />
+      )}
+    </div>
+  );
 
   if (typeof window !== 'undefined' && isFullScreen) {
     return createPortal(
@@ -2189,99 +2367,13 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
         <div className="relative flex flex-col items-center justify-center">
           {/* Avatar Head Capsule and Vector Speech Sync Mouth Area (Standard size preserved) */}
           <div className="relative w-48 h-48 md:w-72 md:h-72 rounded-full transition-all duration-500 overflow-hidden z-20 bg-white shadow-2xl border border-slate-100 flex-shrink-0">
-            
             {showGreetingIndicator && (
                 <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
                    <div className="absolute w-56 h-56 rounded-full border-4 border-green-400 animate-ping opacity-75"></div>
                    <div className="absolute w-64 h-64 rounded-full border-2 border-green-400 animate-pulse opacity-50"></div>
                 </div>
             )}
-
-            <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center relative bg-white">
-              {/* Permanent base avatar image underlay so it never stays blank */}
-              <img
-                src={currentImageFromSeq}
-                alt="Smart Avatar Face"
-                style={{ 
-                  filter: activeFilter,
-                  transform: activeCameraStyle.transform
-                }}
-                className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-                referrerPolicy="no-referrer"
-              />
-
-              {/* Previous Video Transition Layer for Seamless Crossfading */}
-              {transitionState.prevUrl && (
-                <video
-                  key={`prev-video-${transitionState.transitionKey}`}
-                  src={transitionState.prevUrl}
-                  autoPlay={false}
-                  loop={false}
-                  muted
-                  playsInline
-                  controls={false}
-                  ref={(el) => {
-                    if (el) {
-                      el.currentTime = transitionState.prevTime;
-                      el.pause();
-                      const handlePlayBypass = () => el.pause();
-                      el.addEventListener('play', handlePlayBypass);
-                      if (el.currentTime !== transitionState.prevTime) {
-                        el.currentTime = transitionState.prevTime;
-                      }
-                    }
-                  }}
-                  style={{ 
-                    filter: activeFilter,
-                    transform: activeCameraStyle.transform,
-                  }}
-                  className={`absolute inset-0 w-full h-full object-cover z-30 pointer-events-none transition-opacity duration-[1500ms] ease-in-out ${
-                    transitionState.transitionActive ? "opacity-0" : "opacity-100"
-                  }`}
-                />
-              )}
-              {/* The photographic face physical layer (Image or Autoplay Video) */}
-              {finalVideoSource ? (
-                <video
-                  key={finalVideoSource}
-                  ref={videoRef}
-                  src={finalVideoSource}
-                  autoPlay
-                  loop={false}
-                  onLoadedMetadata={(e) => {
-                    const video = e.currentTarget;
-                    video.play().catch(() => {
-                      video.muted = true;
-                      video.play().catch(() => {});
-                    });
-                  }}
-                  onCanPlay={(e) => {
-                    const video = e.currentTarget;
-                    video.play().catch(() => {
-                      video.muted = true;
-                      video.play().catch(() => {});
-                    });
-                  }}
-                  onError={() => {
-                    console.warn("Video playback error for source:", finalVideoSource);
-                    if (tempVideoUrl) setTempVideoUrl(null);
-                  }}
-                  onEnded={(e) => handleVideoEnded(finalVideoSource, e)}
-                  muted={!isSpeaking}
-                  playsInline
-                  controls={false}
-                  style={{ 
-                    filter: activeFilter,
-                    transform: activeCameraStyle.transform
-                  }}
-                  className={`w-full h-full object-cover transition-all ease-out transition-opacity duration-[1500ms] ease-in-out ${currentOpacityClass}`}
-                  onClick={(e) => {
-                    const video = e.currentTarget;
-                    video.muted = !video.muted;
-                  }}
-                />
-              ) : null}
-            </div>
+            {renderAvatarMediaCore()}
 
             {/* Minimize button overlay on avatar circle bottom right corner */}
             <button
@@ -2319,101 +2411,13 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
 
         {/* Avatar Head Capsule and Vector Speech Sync Mouth Area */}
         <div className={`relative w-48 h-48 md:w-72 md:h-72 rounded-full transition-all duration-500 overflow-hidden z-20 bg-white`}>
-          
           {showGreetingIndicator && (
               <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
                  <div className="absolute w-56 h-56 rounded-full border-4 border-green-400 animate-ping opacity-75"></div>
                  <div className="absolute w-64 h-64 rounded-full border-2 border-green-400 animate-pulse opacity-50"></div>
               </div>
           )}
-
-          <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center relative bg-white">
-            {/* Permanent base avatar image underlay so it never stays blank */}
-            <img
-              src={currentImageFromSeq}
-              alt="Smart Avatar Face"
-              style={{ 
-                filter: activeFilter,
-                transform: activeCameraStyle.transform
-              }}
-              className="absolute inset-0 w-full h-full object-cover pointer-events-none"
-              referrerPolicy="no-referrer"
-            />
-
-            {/* Previous Video Transition Layer for Seamless Crossfading */}
-            {transitionState.prevUrl && (
-              <video
-                key={`prev-video-${transitionState.transitionKey}`}
-                src={transitionState.prevUrl}
-                autoPlay={false}
-                loop={false}
-                muted
-                playsInline
-                controls={false}
-                ref={(el) => {
-                  if (el) {
-                    el.currentTime = transitionState.prevTime;
-                    el.pause();
-                    const handlePlayBypass = () => el.pause();
-                    el.addEventListener('play', handlePlayBypass);
-                    if (el.currentTime !== transitionState.prevTime) {
-                      el.currentTime = transitionState.prevTime;
-                    }
-                  }
-                }}
-                style={{ 
-                  filter: activeFilter,
-                  transform: activeCameraStyle.transform,
-                }}
-                className={`absolute inset-0 w-full h-full object-cover z-30 pointer-events-none transition-opacity duration-[1500ms] ease-in-out ${
-                  transitionState.transitionActive ? "opacity-0" : "opacity-100"
-                }`}
-              />
-            )}
-            {/* The photographic face physical layer (Image or Autoplay Video) */}
-            {finalVideoSource ? (
-              <video
-                key={finalVideoSource}
-                ref={videoRef}
-                src={finalVideoSource}
-                autoPlay
-                loop={false}
-                onLoadedMetadata={(e) => {
-                  const video = e.currentTarget;
-                  video.play().catch(() => {
-                    video.muted = true;
-                    video.play().catch(() => {});
-                  });
-                }}
-                onCanPlay={(e) => {
-                  const video = e.currentTarget;
-                  video.play().catch(() => {
-                    video.muted = true;
-                    video.play().catch(() => {});
-                  });
-                }}
-                onError={() => {
-                  console.warn("Video playback error for source:", finalVideoSource);
-                  if (tempVideoUrl) setTempVideoUrl(null);
-                }}
-                onEnded={(e) => handleVideoEnded(finalVideoSource, e)}
-                muted={!isSpeaking}
-                playsInline
-                controls={false}
-                style={{ 
-                  filter: activeFilter,
-                  transform: activeCameraStyle.transform
-                }}
-                className={`w-full h-full object-cover transition-all ease-out transition-opacity duration-[1500ms] ease-in-out ${currentOpacityClass}`}
-                onClick={(e) => {
-                  const video = e.currentTarget;
-                  video.muted = !video.muted;
-                }}
-              />
-            ) : null}
-          </div>
-
-          {/* Audio Wave Modulation Bars Overlay removed */}
+          {renderAvatarMediaCore()}
         </div>
 
         {/* Custom Question Analyzer Controls */}
