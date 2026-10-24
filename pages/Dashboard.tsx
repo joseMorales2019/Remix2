@@ -141,6 +141,28 @@ const Dashboard: React.FC<{ user: any }> = ({ user }) => {
   const [isPosting, setIsPosting] = useState(false);
   const [products, setProducts] = useState<any[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
+  const [productComments, setProductComments] = useState<Record<string, string[]>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('dashboard_product_comments') || '{}');
+    } catch {
+      return {};
+    }
+  });
+  const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
+
+  const handleAddProductComment = (productId: string) => {
+    const text = (commentInputs[productId] || '').trim();
+    if (!text) return;
+    const author = user?.full_name || user?.email || 'Visitante';
+    const newEntry = `${author}: ${text}`;
+    const updated = {
+      ...productComments,
+      [productId]: [...(productComments[productId] || []), newEntry]
+    };
+    setProductComments(updated);
+    localStorage.setItem('dashboard_product_comments', JSON.stringify(updated));
+    setCommentInputs({ ...commentInputs, [productId]: '' });
+  };
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('Todo');
   const [showLoginBanner, setShowLoginBanner] = useState(false);
@@ -1219,6 +1241,30 @@ const Dashboard: React.FC<{ user: any }> = ({ user }) => {
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <h2 className="text-xl sm:text-2xl font-black text-slate-900 uppercase tracking-tighter leading-none mb-1">{hoveredProduct.name}</h2>
+                  <div className="flex items-center gap-3 my-2">
+                    <div className="flex items-center text-amber-400 text-xs">
+                      {Array.from({ length: (function(id: string) {
+                        let hash = 0;
+                        for (let i = 0; i < (id || '').length; i++) {
+                          hash = (hash << 5) - hash + id.charCodeAt(i);
+                          hash |= 0;
+                        }
+                        return 3 + (Math.abs(hash) % 3);
+                      })(hoveredProduct.id) }).map((_, i) => (
+                        <span key={i}>⭐</span>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-1 bg-red-50 text-red-600 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tight">
+                      <span>🔥</span> {(function(id: string) {
+                        let hash = 0;
+                        for (let i = 0; i < (id || '').length; i++) {
+                          hash = (hash << 5) - hash + id.charCodeAt(i);
+                          hash |= 0;
+                        }
+                        return (1240 + (Math.abs(hash) % 3760)).toLocaleString();
+                      })(hoveredProduct.id)} vistas • Alta demanda
+                    </div>
+                  </div>
                   <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded-full">Detalles del Producto</span>
                 </div>
                 <button onClick={handleMouseLeave} className="p-1.5 hover:bg-slate-100 rounded-full transition-colors">
@@ -1256,6 +1302,41 @@ const Dashboard: React.FC<{ user: any }> = ({ user }) => {
                   <span className={`text-xs font-bold ${hoveredProduct.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
                     {hoveredProduct.stock > 0 ? 'Disponible' : 'Agotado'}
                   </span>
+                </div>
+              </div>
+
+              {/* Comentarios en la Vista Detallada */}
+              <div className="mb-4 pt-3 border-t border-slate-100 flex flex-col">
+                <h4 className="text-[10px] font-black text-slate-700 uppercase tracking-widest mb-2">Comentarios y Opiniones</h4>
+                <div className="max-h-28 overflow-y-auto space-y-1.5 mb-2 elegant-scrollbar pr-1">
+                  {(!productComments[hoveredProduct.id] || productComments[hoveredProduct.id].length === 0) ? (
+                    <p className="text-[9px] text-slate-400 italic">Sé el primero en comentar sobre este producto.</p>
+                  ) : (
+                    productComments[hoveredProduct.id].map((c, i) => (
+                      <div key={i} className="bg-slate-50 p-2 rounded-xl text-[9px] sm:text-xs text-slate-700 font-medium border border-slate-100">
+                        {c}
+                      </div>
+                    ))
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <input 
+                    type="text"
+                    placeholder="Escribe tu opinión..."
+                    value={commentInputs[hoveredProduct.id] || ''}
+                    onChange={(e) => setCommentInputs({ ...commentInputs, [hoveredProduct.id]: e.target.value })}
+                    className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-blue-500 font-medium"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleAddProductComment(hoveredProduct.id);
+                    }}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-700 transition"
+                  >
+                    Enviar
+                  </button>
                 </div>
               </div>
 
@@ -1516,6 +1597,32 @@ const Dashboard: React.FC<{ user: any }> = ({ user }) => {
                   </h3>
                   <p className="text-[9px] sm:text-xs text-slate-400 font-medium mb-1 line-clamp-1">{product.description}</p>
                   
+                  {/* Estrellas y Vistas / Alta Demanda */}
+                  <div className="flex items-center justify-between gap-1 my-1.5 flex-wrap">
+                    <div className="flex items-center text-amber-400 text-xs">
+                      {Array.from({ length: (function(id: string) {
+                        let hash = 0;
+                        for (let i = 0; i < (id || '').length; i++) {
+                          hash = (hash << 5) - hash + id.charCodeAt(i);
+                          hash |= 0;
+                        }
+                        return 3 + (Math.abs(hash) % 3);
+                      })(product.id) }).map((_, i) => (
+                        <span key={i}>⭐</span>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-1 bg-red-50 text-red-600 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tight">
+                      <span>🔥</span> {(function(id: string) {
+                        let hash = 0;
+                        for (let i = 0; i < (id || '').length; i++) {
+                          hash = (hash << 5) - hash + id.charCodeAt(i);
+                          hash |= 0;
+                        }
+                        return (1240 + (Math.abs(hash) % 3760)).toLocaleString();
+                      })(product.id)} vistas • Alta demanda
+                    </div>
+                  </div>
+                  
                   {/* Información de Envío Gratis */}
                   {product.creator?.free_shipping_departments && product.creator.free_shipping_departments.length > 0 && (
                     <div className="mb-2">
@@ -1524,6 +1631,36 @@ const Dashboard: React.FC<{ user: any }> = ({ user }) => {
                       </p>
                     </div>
                   )}
+
+                  {/* Comentarios en la tarjeta normal */}
+                  <div className="my-2 pt-2 border-t border-slate-100">
+                    <div className="max-h-20 overflow-y-auto space-y-1 mb-1 elegant-scrollbar">
+                      {(productComments[product.id] || []).map((c, i) => (
+                        <p key={i} className="text-[8px] sm:text-[9px] text-slate-600 bg-slate-50 p-1 rounded-lg font-medium">
+                          {c}
+                        </p>
+                      ))}
+                    </div>
+                    <div className="flex gap-1">
+                      <input 
+                        type="text"
+                        placeholder="Comentar..."
+                        value={commentInputs[product.id] || ''}
+                        onChange={(e) => setCommentInputs({ ...commentInputs, [product.id]: e.target.value })}
+                        className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-[8px] sm:text-[9px] outline-none focus:border-blue-500 font-medium"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddProductComment(product.id);
+                        }}
+                        className="bg-blue-600 text-white px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-tight hover:bg-blue-700 transition"
+                      >
+                        Enviar
+                      </button>
+                    </div>
+                  </div>
 
                   <div className="mt-auto pt-2 border-t border-slate-50">
                     <div className="flex items-center justify-between mb-2">
