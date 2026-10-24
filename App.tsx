@@ -677,6 +677,49 @@ const App: React.FC = () => {
           } else {
             localStorage.removeItem('newbank_profile_id');
           }
+        } else {
+          // Verificar retorno de sesión OAuth de Google
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user && localStorage.getItem('google_auth_pending') === 'true') {
+            const targetType = localStorage.getItem('google_auth_profile_type') || 'invitado';
+            const email = session.user.email?.trim().toLowerCase();
+            if (email) {
+              const { data: existingProf } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('email', email)
+                .eq('profile_type', targetType)
+                .maybeSingle();
+
+              if (existingProf) {
+                localStorage.setItem('newbank_profile_id', existingProf.id);
+                setUserProfile(existingProf);
+              } else {
+                const fullName = session.user.user_metadata?.full_name || session.user.user_metadata?.name || email.split('@')[0];
+                const avatarUrl = session.user.user_metadata?.avatar_url || session.user.user_metadata?.picture || null;
+                const { data: newProf } = await supabase
+                  .from('profiles')
+                  .insert({
+                    full_name: fullName,
+                    email: email,
+                    profile_type: targetType,
+                    profile_image_url: avatarUrl,
+                    reliability_score: 50,
+                    password: 'google_auth_account',
+                    is_verified: true,
+                  })
+                  .select()
+                  .single();
+
+                if (newProf) {
+                  localStorage.setItem('newbank_profile_id', newProf.id);
+                  setUserProfile(newProf);
+                }
+              }
+            }
+            localStorage.removeItem('google_auth_pending');
+            localStorage.removeItem('google_auth_profile_type');
+          }
         }
       } catch (err) {
         console.error("Critical error in initApp:", err);

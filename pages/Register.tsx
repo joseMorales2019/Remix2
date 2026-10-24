@@ -255,6 +255,118 @@ const Register: React.FC<RegisterProps> = ({ onRegistered }) => {
     setError('');
   };
 
+  // Autenticación con Google
+  const handleGoogleSignIn = async () => {
+    if (!profileType) {
+      setError('Por favor selecciona un perfil en "Selecciona tu perfil".');
+      return;
+    }
+    setError('');
+    setLoading(true);
+    try {
+      localStorage.setItem('google_auth_profile_type', profileType);
+      localStorage.setItem('google_auth_pending', 'true');
+
+      const redirectUrl = `${window.location.origin}${window.location.pathname}`;
+      const { error: oauthErr } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'select_account',
+          }
+        }
+      });
+      if (oauthErr) throw oauthErr;
+    } catch (err: any) {
+      console.error('Error al iniciar sesión con Google:', err);
+      setError(err.message || 'Error al conectar con Google.');
+      localStorage.removeItem('google_auth_pending');
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const handleGoogleRedirect = async () => {
+      try {
+        const isPending = localStorage.getItem('google_auth_pending') === 'true';
+        const hash = window.location.hash || '';
+        const search = window.location.search || '';
+        const hasAuthTokens = hash.includes('access_token') || hash.includes('error') || search.includes('code=');
+
+        if (isPending || hasAuthTokens) {
+          const { data: { session }, error: sessErr } = await supabase.auth.getSession();
+          if (sessErr) throw sessErr;
+
+          if (session?.user) {
+            setLoading(true);
+            const targetType = localStorage.getItem('google_auth_profile_type') || profileType || 'invitado';
+            const email = session.user.email?.trim().toLowerCase();
+            if (!email) throw new Error("No se pudo obtener el correo de la cuenta de Google.");
+
+            // Buscar si ya existe el perfil para este correo y tipo de perfil
+            const { data: existingProf, error: findErr } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('email', email)
+              .eq('profile_type', targetType)
+              .maybeSingle();
+
+            if (findErr) console.warn("Aviso al buscar perfil de Google:", findErr);
+
+            if (existingProf) {
+              localStorage.setItem('newbank_profile_id', existingProf.id);
+              localStorage.removeItem('google_auth_pending');
+              localStorage.removeItem('google_auth_profile_type');
+              onRegistered(existingProf);
+              navigate('/');
+              return;
+            }
+
+            // Crear nuevo perfil vinculado a Google
+            const fullName = session.user.user_metadata?.full_name || 
+                             session.user.user_metadata?.name || 
+                             email.split('@')[0];
+            const avatarUrl = session.user.user_metadata?.avatar_url || 
+                              session.user.user_metadata?.picture || 
+                              null;
+
+            const { data: newProf, error: insErr } = await supabase
+              .from('profiles')
+              .insert({
+                full_name: fullName,
+                email: email,
+                profile_type: targetType,
+                profile_image_url: avatarUrl,
+                reliability_score: 50,
+                password: 'google_auth_account',
+                is_verified: true,
+              })
+              .select()
+              .single();
+
+            if (insErr) throw insErr;
+
+            localStorage.setItem('newbank_profile_id', newProf.id);
+            localStorage.removeItem('google_auth_pending');
+            localStorage.removeItem('google_auth_profile_type');
+            onRegistered(newProf);
+            navigate('/');
+          }
+        }
+      } catch (err: any) {
+        console.error("Error al procesar sesión de Google:", err);
+        setError(err.message || 'Error al autenticar con Google.');
+        localStorage.removeItem('google_auth_pending');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    handleGoogleRedirect();
+  }, []);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault(); setLoading(true); setError('');
     try {
@@ -395,6 +507,30 @@ const Register: React.FC<RegisterProps> = ({ onRegistered }) => {
               <button type="submit" disabled={loading} className="w-full py-5 rounded-2xl font-black bg-blue-600 text-white shadow-xl mt-4">
                 {loading ? 'Verificando...' : 'Acceder'}
               </button>
+
+              <div className="pt-2">
+                <div className="flex items-center my-3">
+                  <div className="flex-grow border-t border-slate-200"></div>
+                  <span className="px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">o</span>
+                  <div className="flex-grow border-t border-slate-200"></div>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={handleGoogleSignIn} 
+                  disabled={loading}
+                  className="w-full py-4 px-6 bg-white hover:bg-slate-50 text-slate-700 font-black rounded-2xl border-2 border-slate-200 hover:border-blue-400 transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-3 text-xs sm:text-sm active:scale-[0.99] cursor-pointer"
+                >
+                  <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                  </svg>
+                  <span>
+                    {loading ? 'Conectando con Google...' : `Acceder con Google ${profileType ? `(como ${profileType === 'ayudame' ? 'ayúdame' : profileType === 'estudiante' ? 'emprendedor' : profileType})` : ''}`}
+                  </span>
+                </button>
+              </div>
             </form>
           ) : (
             <>
@@ -467,6 +603,31 @@ const Register: React.FC<RegisterProps> = ({ onRegistered }) => {
                         {profileMessages[hoveredType]}
                       </div>
                     )}
+                  </div>
+
+                  {/* Botón de Acceder con Google */}
+                  <div className="pt-2">
+                    <button 
+                      type="button" 
+                      onClick={handleGoogleSignIn} 
+                      disabled={loading}
+                      className="w-full py-4 px-6 bg-white hover:bg-slate-50 text-slate-700 font-black rounded-2xl border-2 border-slate-200 hover:border-blue-400 transition-all shadow-sm hover:shadow-md flex items-center justify-center gap-3 text-xs sm:text-sm active:scale-[0.99] cursor-pointer"
+                    >
+                      <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                      </svg>
+                      <span>
+                        {loading ? 'Conectando con Google...' : `Acceder con Google ${profileType ? `(como ${profileType === 'ayudame' ? 'ayúdame' : profileType === 'estudiante' ? 'emprendedor' : profileType})` : ''}`}
+                      </span>
+                    </button>
+                    <div className="flex items-center my-4">
+                      <div className="flex-grow border-t border-slate-200"></div>
+                      <span className="px-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">o continúa con formulario manual</span>
+                      <div className="flex-grow border-t border-slate-200"></div>
+                    </div>
                   </div>
 
                   <div className="space-y-4">
