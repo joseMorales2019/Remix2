@@ -130,8 +130,8 @@ const SmartSlideMenu: React.FC<{ user: any; onSignOut: () => void }> = ({ user, 
 
   // Definición de enlaces con lógica de roles basada en el prompt
   const navLinks = [
-    { to: "/", label: "Realizar Pedidos", icon: "🛵", category: 'Navegación', roles: ['admin', 'especialista', 'estudiante', 'invitado', 'inversionista', 'MYPE', 'aliado', 'jugador', 'ayudame', 'creditos'] },
-    { to: "/dashboard", label: "Tienda en linea", icon: "📊", category: 'Navegación', roles: ['admin', 'especialista', 'estudiante', 'invitado', 'inversionista', 'MYPE', 'aliado', 'jugador', 'ayudame', 'creditos'] },
+    { to: "/", label: "Tienda en linea", icon: "📊", category: 'Navegación', roles: ['admin', 'especialista', 'estudiante', 'invitado', 'inversionista', 'MYPE', 'aliado', 'jugador', 'ayudame', 'creditos'] },
+    { to: "/domicilio", label: "Realizar Pedidos", icon: "🛵", category: 'Navegación', roles: ['admin', 'especialista', 'estudiante', 'invitado', 'inversionista', 'MYPE', 'aliado', 'jugador', 'ayudame', 'creditos'] },
     { to: "/donaciones", label: "Donar a Ancianos", icon: "❤️", category: 'Navegación', roles: ['admin', 'especialista', 'estudiante', 'invitado', 'inversionista', 'MYPE', 'aliado', 'jugador', 'ayudame', 'creditos'] },
     { to: "/gallery", label: "Galería", icon: "🖼️", category: 'Comunidad', roles: ['admin', 'especialista', 'estudiante', 'inversionista', 'MYPE'] },
 
@@ -756,7 +756,7 @@ const App: React.FC = () => {
         <SmartSlideMenu user={userProfile} onSignOut={handleSignOut} />
         <main className="flex-grow">
           <Routes>
-            <Route path="/" element={<ADomicilio user={userProfile} />} />
+            <Route path="/" element={<Dashboard user={userProfile} />} />
             <Route path="/domicilio" element={<ADomicilio user={userProfile} />} />
             <Route path="/dashboard" element={<Dashboard user={userProfile} />} />
             <Route path="/store" element={userProfile ? <Store user={userProfile} /> : <Navigate to="/register" />} />
