@@ -164,7 +164,11 @@ const Dashboard: React.FC<{ user: any }> = ({ user }) => {
   useEffect(() => {
     const handleSync = () => setAvatarConfig(getStoredConfig());
     window.addEventListener('avatar-config-updated', handleSync);
-    return () => window.removeEventListener('avatar-config-updated', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('avatar-config-updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
   }, []);
 
   const generateGreetingVideo = async (name: string) => {
@@ -318,6 +322,9 @@ const Dashboard: React.FC<{ user: any }> = ({ user }) => {
   // Helper function to start an idle cycle
   const startIdleCycle = () => {
     const config = getStoredConfig();
+    if (config.is_avatar_visible_to_users === false || config.show_on_home === false) {
+      return;
+    }
     const idleVideos = config.is_tiktoker_mode_enabled
       ? Object.entries(config.video_settings || {})
       : Object.entries(config.video_settings || {})
@@ -883,7 +890,7 @@ const Dashboard: React.FC<{ user: any }> = ({ user }) => {
   return (
     <>
       <InteractiveDialogue 
-        isOpen={activeDialogueUser !== null && avatarConfig?.is_avatar_visible_to_users !== false} 
+        isOpen={activeDialogueUser !== null && avatarConfig?.is_avatar_visible_to_users !== false && avatarConfig?.show_on_home !== false} 
         onClose={() => setActiveDialogueUser(null)} 
         detectedUser={activeDialogueUser || { name: '', fullName: '' }} 
         products={products}
@@ -891,7 +898,7 @@ const Dashboard: React.FC<{ user: any }> = ({ user }) => {
 
       <AdminAvatarPanel user={user} />
 
-      {(avatarConfig?.is_avatar_visible_to_users !== false && (avatarConfig?.show_on_home !== false || user?.is_admin || user?.profile_type === 'admin')) && (
+      {(avatarConfig?.is_avatar_visible_to_users !== false && avatarConfig?.show_on_home !== false) && (
         <motion.div
            drag
            dragMomentum={false}

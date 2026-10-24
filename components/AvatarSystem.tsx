@@ -125,12 +125,17 @@ export const getStoredConfig = (): AvatarConfig => {
     return memoryConfigCache;
   }
   
+  const isPermanentlyDeactivated = typeof window !== 'undefined' && (
+    localStorage.getItem('newbank_avatar_permanently_deactivated') === 'true' ||
+    localStorage.getItem('newbank_avatar_visible') === 'false'
+  );
+
   const defaultConfig: AvatarConfig = {
     image_url: DEFAULT_AVATAR_IMAGE,
     prompt: "A polished digital clone, highly realistic face, smiling professional banker, solid white background, Salvadoran aesthetic, highly detailed, 4k",
     show_after_greeting: true,
-    show_on_home: true,
-    is_avatar_visible_to_users: true,
+    show_on_home: !isPermanentlyDeactivated,
+    is_avatar_visible_to_users: !isPermanentlyDeactivated,
     trigger_keywords: "newbank, tarjeta, precio, hola, celular, comprar, whatsapp",
     selected_personality: "hospitalaria",
     selected_behavior: "proactivo",
@@ -152,6 +157,11 @@ export const getStoredConfig = (): AvatarConfig => {
         ...parsed
       };
       
+      if (isPermanentlyDeactivated) {
+        config.is_avatar_visible_to_users = false;
+        config.show_on_home = false;
+      }
+
       config.image_url = sanitizeDefaultUrls(config.image_url);
       config.initial_image_url = sanitizeDefaultUrls(config.initial_image_url);
       config.final_image_url = sanitizeDefaultUrls(config.final_image_url);
@@ -246,11 +256,20 @@ export const saveStoredSequences = (sequences: AvatarSequence[]) => {
 
 export const syncFromDatabase = async (): Promise<{ config: AvatarConfig | null; sequences: AvatarSequence[] | null }> => {
   try {
+    const isPermanentlyDeactivated = typeof window !== 'undefined' && (
+      localStorage.getItem('newbank_avatar_permanently_deactivated') === 'true' ||
+      localStorage.getItem('newbank_avatar_visible') === 'false'
+    );
+
     // 1. Fetch config from Supabase
     const { data: configData } = await supabase.from('avatar_configs').select('*').limit(1).maybeSingle();
     let loadedConfig: AvatarConfig | null = null;
     if (configData) {
       loadedConfig = { ...getStoredConfig(), ...configData };
+      if (isPermanentlyDeactivated) {
+        loadedConfig.is_avatar_visible_to_users = false;
+        loadedConfig.show_on_home = false;
+      }
       saveStoredConfig(loadedConfig);
     }
 
@@ -547,13 +566,14 @@ export const AdminAvatarPanel: React.FC<AdminAvatarPanelProps> = ({ user, onConf
   };
 
   const handleToggleAvatarVisibility = async () => {
-    const isCurrentlyVisible = config.is_avatar_visible_to_users !== false;
-    const nextVisibility = !isCurrentlyVisible;
-
     // Detener inmediatamente síntesis de voz y audios activos
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
+
+    // Al hacer click en el botón 👁️ Activar / Mostrar Avatares en Pantalla,
+    // se desactiva inmediatamente la visualización del avatar y la configuración queda permanente.
+    const nextVisibility = false;
 
     const updatedConfig: AvatarConfig = {
       ...config,
@@ -562,35 +582,39 @@ export const AdminAvatarPanel: React.FC<AdminAvatarPanelProps> = ({ user, onConf
     };
 
     setConfig(updatedConfig);
+    memoryConfigCache = updatedConfig;
     saveStoredConfig(updatedConfig);
-    window.dispatchEvent(new Event('avatar-config-updated'));
 
-    if (!nextVisibility) {
-      setSuccessMsg("¡Avatares ocultados y desactivados inmediatamente!");
-    } else {
-      setSuccessMsg("¡Avatares activados y visibles en pantalla!");
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('newbank_avatar_permanently_deactivated', 'true');
+      localStorage.setItem('newbank_avatar_visible', 'false');
+      window.dispatchEvent(new Event('avatar-config-updated'));
+      window.dispatchEvent(new Event('storage'));
     }
-    setTimeout(() => setSuccessMsg(""), 4000);
 
+    setSuccessMsg("¡Visualización de avatares desactivada y ocultada permanentemente en Tienda en línea!");
+    setTimeout(() => setSuccessMsg(""), 5000);
+
+    // 1. Guardar permanentemente en backend Supabase Admin (bypasses RLS)
     try {
-      const { data: existing } = await supabase.from('avatar_configs').select('id').limit(1).maybeSingle();
-      await supabase.from('avatar_configs').upsert({
-        id: existing?.id || (updatedConfig.id || crypto.randomUUID()),
-        prompt: updatedConfig.prompt,
-        image_url: updatedConfig.image_url,
-        show_after_greeting: updatedConfig.show_after_greeting,
-        show_on_home: updatedConfig.show_on_home,
-        is_avatar_visible_to_users: updatedConfig.is_avatar_visible_to_users,
-        trigger_keywords: updatedConfig.trigger_keywords,
-        selected_personality: updatedConfig.selected_personality,
-        selected_behavior: updatedConfig.selected_behavior,
-        permanent_animation_prompt: updatedConfig.permanent_animation_prompt,
-        video_emotions: updatedConfig.video_emotions,
-        video_settings: updatedConfig.video_settings,
-        video_triggers: updatedConfig.video_triggers,
-        is_tiktoker_mode_enabled: updatedConfig.is_tiktoker_mode_enabled,
-        video_url: updatedConfig.video_url
+      await fetch(getApiUrl('/api/avatar-config/visibility'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          is_avatar_visible_to_users: false,
+          show_on_home: false
+        })
       });
+    } catch (apiErr) {
+      console.warn("Backend visibility endpoint warning:", apiErr);
+    }
+
+    // 2. Guardar permanentemente en tabla avatar_configs de Supabase
+    try {
+      await supabase.from('avatar_configs').update({
+        is_avatar_visible_to_users: false,
+        show_on_home: false
+      }).neq('id', '00000000-0000-0000-0000-000000000000');
     } catch (err) {
       console.warn("Error updating avatar visibility in Supabase:", err);
     }

@@ -319,6 +319,69 @@ async function startServer() {
     }
   });
 
+  // Endpoint to permanently persist avatar visibility configuration to Supabase database (bypasses RLS)
+  app.post("/api/avatar-config/visibility", async (req, res) => {
+    try {
+      const { is_avatar_visible_to_users, show_on_home } = req.body;
+      const visible = is_avatar_visible_to_users !== undefined ? Boolean(is_avatar_visible_to_users) : false;
+      const onHome = show_on_home !== undefined ? Boolean(show_on_home) : visible;
+
+      // Update all rows in avatar_configs
+      const { data: updatedRows, error: updateError } = await supabaseAdmin
+        .from('avatar_configs')
+        .update({
+          is_avatar_visible_to_users: visible,
+          show_on_home: onHome
+        })
+        .neq('id', '00000000-0000-0000-0000-000000000000')
+        .select();
+
+      if (updateError) {
+        console.warn("Could not update existing avatar_configs with supabaseAdmin:", updateError);
+      }
+
+      // If no rows existed, insert a default row
+      if (!updatedRows || updatedRows.length === 0) {
+        await supabaseAdmin.from('avatar_configs').insert({
+          is_avatar_visible_to_users: visible,
+          show_on_home: onHome,
+          prompt: "A polished digital clone, highly realistic face, smiling professional banker",
+          selected_personality: "hospitalaria",
+          selected_behavior: "proactivo"
+        });
+      }
+
+      console.log(`[Avatar Visibility] Configuración guardada permanentemente en Supabase: visible=${visible}, onHome=${onHome}`);
+      res.json({
+        success: true,
+        is_avatar_visible_to_users: visible,
+        show_on_home: onHome
+      });
+    } catch (err: any) {
+      console.error("Error setting avatar visibility in backend:", err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.get("/api/avatar-config/visibility", async (req, res) => {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('avatar_configs')
+        .select('is_avatar_visible_to_users, show_on_home')
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+      res.json({
+        success: true,
+        is_avatar_visible_to_users: data ? data.is_avatar_visible_to_users : true,
+        show_on_home: data ? data.show_on_home : true
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // Check if a greeting video exists for a user
   app.get("/api/greeting-video/:username", async (req, res) => {
     try {
