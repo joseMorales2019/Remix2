@@ -150,7 +150,36 @@ const Dashboard: React.FC<{ user: any }> = ({ user }) => {
   });
   const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
 
-  const handleAddProductComment = (productId: string) => {
+  useEffect(() => {
+    const fetchProductComments = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('product_comments')
+          .select('*')
+          .order('created_at', { ascending: true });
+        if (!error && data && data.length > 0) {
+          const map: Record<string, string[]> = {};
+          data.forEach((item: any) => {
+            const entry = `${item.user_name || 'Visitante'}: ${item.comment}`;
+            if (!map[item.product_id]) map[item.product_id] = [];
+            map[item.product_id].push(entry);
+          });
+          setProductComments(prev => {
+            const merged = { ...prev };
+            Object.keys(map).forEach(pid => {
+              merged[pid] = Array.from(new Set([...(merged[pid] || []), ...map[pid]]));
+            });
+            return merged;
+          });
+        }
+      } catch (err) {
+        // Fallback silencioso a localStorage si la tabla aún no se ha ejecutado en Supabase
+      }
+    };
+    fetchProductComments();
+  }, []);
+
+  const handleAddProductComment = async (productId: string) => {
     const text = (commentInputs[productId] || '').trim();
     if (!text) return;
     const author = user?.full_name || user?.email || 'Visitante';
@@ -162,6 +191,19 @@ const Dashboard: React.FC<{ user: any }> = ({ user }) => {
     setProductComments(updated);
     localStorage.setItem('dashboard_product_comments', JSON.stringify(updated));
     setCommentInputs({ ...commentInputs, [productId]: '' });
+
+    try {
+      await supabase.from('product_comments').insert([
+        {
+          product_id: productId,
+          user_id: user?.id || null,
+          user_name: author,
+          comment: text
+        }
+      ]);
+    } catch (err) {
+      // Ignorar error si la tabla aún no existe en Supabase
+    }
   };
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('Todo');
