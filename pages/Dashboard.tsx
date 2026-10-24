@@ -883,7 +883,7 @@ const Dashboard: React.FC<{ user: any }> = ({ user }) => {
   return (
     <>
       <InteractiveDialogue 
-        isOpen={activeDialogueUser !== null} 
+        isOpen={activeDialogueUser !== null && avatarConfig?.is_avatar_visible_to_users !== false} 
         onClose={() => setActiveDialogueUser(null)} 
         detectedUser={activeDialogueUser || { name: '', fullName: '' }} 
         products={products}
@@ -891,7 +891,7 @@ const Dashboard: React.FC<{ user: any }> = ({ user }) => {
 
       <AdminAvatarPanel user={user} />
 
-      {(avatarConfig?.show_on_home !== false || user?.is_admin || user?.profile_type === 'admin') && (
+      {(avatarConfig?.is_avatar_visible_to_users !== false && (avatarConfig?.show_on_home !== false || user?.is_admin || user?.profile_type === 'admin')) && (
         <motion.div
            drag
            dragMomentum={false}

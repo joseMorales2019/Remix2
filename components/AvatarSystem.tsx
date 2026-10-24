@@ -26,6 +26,7 @@ export interface AvatarConfig {
   prompt: string;
   show_after_greeting: boolean;
   show_on_home?: boolean;
+  is_avatar_visible_to_users?: boolean;
   trigger_keywords: string;
   selected_personality: string;
   selected_behavior: string;
@@ -129,6 +130,7 @@ export const getStoredConfig = (): AvatarConfig => {
     prompt: "A polished digital clone, highly realistic face, smiling professional banker, solid white background, Salvadoran aesthetic, highly detailed, 4k",
     show_after_greeting: true,
     show_on_home: true,
+    is_avatar_visible_to_users: true,
     trigger_keywords: "newbank, tarjeta, precio, hola, celular, comprar, whatsapp",
     selected_personality: "hospitalaria",
     selected_behavior: "proactivo",
@@ -502,7 +504,8 @@ export const AdminAvatarPanel: React.FC<AdminAvatarPanelProps> = ({ user, onConf
         video_emotions: config.video_emotions,
         video_settings: config.video_settings,
         video_triggers: config.video_triggers,
-        is_tiktoker_mode_enabled: config.is_tiktoker_mode_enabled
+        is_tiktoker_mode_enabled: config.is_tiktoker_mode_enabled,
+        is_avatar_visible_to_users: config.is_avatar_visible_to_users !== false
       });
 
       if (error) throw error;
@@ -540,6 +543,58 @@ export const AdminAvatarPanel: React.FC<AdminAvatarPanelProps> = ({ user, onConf
       setTimeout(() => setSuccessMsg(""), 4000);
       window.dispatchEvent(new Event('avatar-config-updated'));
     }
+    if (onConfigChange) onConfigChange();
+  };
+
+  const handleToggleAvatarVisibility = async () => {
+    const isCurrentlyVisible = config.is_avatar_visible_to_users !== false;
+    const nextVisibility = !isCurrentlyVisible;
+
+    // Detener inmediatamente síntesis de voz y audios activos
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+
+    const updatedConfig: AvatarConfig = {
+      ...config,
+      is_avatar_visible_to_users: nextVisibility,
+      show_on_home: nextVisibility
+    };
+
+    setConfig(updatedConfig);
+    saveStoredConfig(updatedConfig);
+    window.dispatchEvent(new Event('avatar-config-updated'));
+
+    if (!nextVisibility) {
+      setSuccessMsg("¡Avatares ocultados y desactivados inmediatamente!");
+    } else {
+      setSuccessMsg("¡Avatares activados y visibles en pantalla!");
+    }
+    setTimeout(() => setSuccessMsg(""), 4000);
+
+    try {
+      const { data: existing } = await supabase.from('avatar_configs').select('id').limit(1).maybeSingle();
+      await supabase.from('avatar_configs').upsert({
+        id: existing?.id || (updatedConfig.id || crypto.randomUUID()),
+        prompt: updatedConfig.prompt,
+        image_url: updatedConfig.image_url,
+        show_after_greeting: updatedConfig.show_after_greeting,
+        show_on_home: updatedConfig.show_on_home,
+        is_avatar_visible_to_users: updatedConfig.is_avatar_visible_to_users,
+        trigger_keywords: updatedConfig.trigger_keywords,
+        selected_personality: updatedConfig.selected_personality,
+        selected_behavior: updatedConfig.selected_behavior,
+        permanent_animation_prompt: updatedConfig.permanent_animation_prompt,
+        video_emotions: updatedConfig.video_emotions,
+        video_settings: updatedConfig.video_settings,
+        video_triggers: updatedConfig.video_triggers,
+        is_tiktoker_mode_enabled: updatedConfig.is_tiktoker_mode_enabled,
+        video_url: updatedConfig.video_url
+      });
+    } catch (err) {
+      console.warn("Error updating avatar visibility in Supabase:", err);
+    }
+
     if (onConfigChange) onConfigChange();
   };
 
@@ -734,6 +789,45 @@ export const AdminAvatarPanel: React.FC<AdminAvatarPanelProps> = ({ user, onConf
                   className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 font-bold transition flex items-center justify-center text-sm"
                 >
                   ✕
+                </button>
+              </div>
+
+              {/* Botón para ocultar y desactivar inmediatamente el uso, presentación y visualización de los avatares */}
+              <div className="mt-4 p-3.5 bg-slate-50 rounded-2xl border border-slate-200 shadow-sm space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <span className={`inline-block w-2 h-2 rounded-full ${config.is_avatar_visible_to_users !== false ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+                    Control Global del Avatar:
+                  </span>
+                  <span className={`text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full ${
+                    config.is_avatar_visible_to_users !== false
+                      ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                      : "bg-red-100 text-red-800 border border-red-200"
+                  }`}>
+                    {config.is_avatar_visible_to_users !== false ? "Activo y Visible" : "Oculto y Desactivado"}
+                  </span>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleToggleAvatarVisibility}
+                  className={`w-full py-3 px-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all transform active:scale-95 shadow-md flex items-center justify-center gap-2 cursor-pointer ${
+                    config.is_avatar_visible_to_users !== false
+                      ? "bg-red-600 hover:bg-red-700 text-white shadow-red-600/20"
+                      : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20"
+                  }`}
+                >
+                  {config.is_avatar_visible_to_users !== false ? (
+                    <>
+                      <span className="text-sm">🚫</span>
+                      <span>Ocultar y Desactivar Avatares Inmediatamente</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-sm">👁️</span>
+                      <span>Activar / Mostrar Avatares en Pantalla</span>
+                    </>
+                  )}
                 </button>
               </div>
 
@@ -1556,6 +1650,7 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [tempVideoUrl, setTempVideoUrl] = useState<string | null>(null);
+  const [dbNotification, setDbNotification] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
   const recognitionRef = useRef<any>(null);
   const transcriptRef = useRef("");
   const pressStartTimeRef = useRef(0);
@@ -1894,16 +1989,18 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
 
               // Auto-sync action and triggers specifically to this avatar's row in Supabase database
               try {
+                let saveError: any = null;
                 if (currentAvatarId) {
-                  await supabase.from('avatar_configs').update({
+                  const { error: updateErr } = await supabase.from('avatar_configs').update({
                     video_url: statusData.video_url,
                     video_emotions: newEmotions,
                     video_triggers: newTriggers
                   }).eq('id', currentAvatarId);
+                  if (updateErr) saveError = updateErr;
                 } else {
                   const { data: existing } = await supabase.from('avatar_configs').select('id').limit(1).maybeSingle();
                   const targetId = existing?.id || (updatedConfig.id || crypto.randomUUID());
-                  await supabase.from('avatar_configs').upsert({
+                  const { error: upsertErr } = await supabase.from('avatar_configs').upsert({
                     id: targetId,
                     prompt: updatedConfig.prompt,
                     image_url: updatedConfig.image_url,
@@ -1919,9 +2016,26 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
                     is_tiktoker_mode_enabled: updatedConfig.is_tiktoker_mode_enabled,
                     video_url: statusData.video_url
                   });
+                  if (upsertErr) saveError = upsertErr;
                 }
-              } catch (dbErr) {
-                console.warn("Could not save new generated video triggers/emotions to DB:", dbErr);
+
+                if (saveError) {
+                  console.error("No se pudo guardar el video en la base de datos:", saveError);
+                  setDbNotification({
+                    type: 'error',
+                    message: `⚠️ No se pudo guardar el video en la base de datos (https://stqthrzbvuqcavtsonba.supabase.co/storage/v1/object/public/newbankVideoAnimadoAvatar/): ${saveError.message || 'Error de permisos o conexión'}`
+                  });
+                  setTimeout(() => setDbNotification(null), 9000);
+                } else {
+                  console.log("✅ Video de respuesta registrado exitosamente en la base de datos de Supabase");
+                }
+              } catch (dbErr: any) {
+                console.error("Error al persistir video en base de datos:", dbErr);
+                setDbNotification({
+                  type: 'error',
+                  message: `⚠️ No se pudo guardar el video en la base de datos (https://stqthrzbvuqcavtsonba.supabase.co/storage/v1/object/public/newbankVideoAnimadoAvatar/): ${dbErr.message || 'Error inesperado'}`
+                });
+                setTimeout(() => setDbNotification(null), 9000);
               }
 
               window.dispatchEvent(new Event('avatar-config-updated'));
@@ -2106,6 +2220,13 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
       activeSpeechSourceRef.current = null;
     }
   };
+
+  useEffect(() => {
+    if (config.is_avatar_visible_to_users === false) {
+      stopAvatarSpeech();
+      setIsFullScreen(false);
+    }
+  }, [config.is_avatar_visible_to_users]);
 
   // Speak avatar response text clearly in natural Salvadoran Spanish
   const speakAvatarVoice = async (textToSpeak: string) => {
@@ -2472,6 +2593,10 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
     </div>
   );
 
+  if (config.is_avatar_visible_to_users === false) {
+    return null;
+  }
+
   if (typeof window !== 'undefined' && isFullScreen) {
     return createPortal(
       <div className="fixed inset-0 w-full h-[100dvh] bg-white z-[999999] flex flex-col items-center justify-center p-4 md:p-8 select-none animate-fadeIn overflow-hidden">
@@ -2570,6 +2695,24 @@ export const SmartAvatarBubble: React.FC<SmartAvatarBubbleProps> = ({
 
         {/* Custom Question Analyzer Controls */}
         <div className="mt-4 w-64 md:w-80 bg-white/95 backdrop-blur-sm p-3 rounded-2xl shadow-lg border border-slate-100 flex flex-col gap-2 z-30 pointer-events-auto">
+          {/* Database error or status notification */}
+          <AnimatePresence>
+            {dbNotification && (
+              <motion.div
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -4 }}
+                className={`p-2 rounded-xl text-[9px] font-bold leading-tight border ${
+                  dbNotification.type === 'error'
+                    ? 'bg-amber-50 border-amber-300 text-amber-900 shadow-sm'
+                    : 'bg-emerald-50 border-emerald-300 text-emerald-900 shadow-sm'
+                }`}
+              >
+                {dbNotification.message}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {isGenerating ? (
             <div className="flex flex-col gap-2 py-3 px-1 animate-fadeIn">
               <div className="flex justify-center items-center text-[10px] font-bold text-slate-500">
@@ -2651,10 +2794,26 @@ export const AvataresAdminPanel: React.FC<{ user: any }> = ({ user }) => {
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [showAllStorageVideos, setShowAllStorageVideos] = useState(false);
 
-  // Videos corresponding exclusively to the selected avatar
+  // Helper to extract timestamp from created_at or numeric filename suffix
+  const getVideoTimestamp = (name: string, createdAt?: string): number => {
+    if (createdAt) {
+      const t = new Date(createdAt).getTime();
+      if (!isNaN(t) && t > 0) return t;
+    }
+    const match = name.match(/(\d{10,13})/);
+    if (match) {
+      const parsed = parseInt(match[1], 10);
+      if (!isNaN(parsed) && parsed > 1500000000) {
+        return parsed < 10000000000 ? parsed * 1000 : parsed;
+      }
+    }
+    return 0;
+  };
+
+  // Videos corresponding exclusively to the selected avatar, sorted by creation date (newest first)
   const avatarVideos = useMemo(() => {
     if (!selectedAvatar) return [];
-    return storedVideos.filter(video => {
+    const filtered = storedVideos.filter(video => {
       if (selectedAvatar.video_url === video.url || selectedAvatar.video_url?.includes(video.name)) return true;
       if (selectedAvatar.video_triggers && Object.prototype.hasOwnProperty.call(selectedAvatar.video_triggers, video.name)) return true;
       if (selectedAvatar.video_emotions && Object.prototype.hasOwnProperty.call(selectedAvatar.video_emotions, video.name)) return true;
@@ -2666,9 +2825,22 @@ export const AvataresAdminPanel: React.FC<{ user: any }> = ({ user }) => {
       }
       return false;
     });
+
+    return filtered.sort((a, b) => {
+      const timeA = getVideoTimestamp(a.name, a.created_at);
+      const timeB = getVideoTimestamp(b.name, b.created_at);
+      return timeB - timeA;
+    });
   }, [selectedAvatar, storedVideos]);
 
-  const displayedVideos = showAllStorageVideos ? storedVideos : avatarVideos;
+  const displayedVideos = useMemo(() => {
+    const list = showAllStorageVideos ? storedVideos : avatarVideos;
+    return [...list].sort((a, b) => {
+      const timeA = getVideoTimestamp(a.name, a.created_at);
+      const timeB = getVideoTimestamp(b.name, b.created_at);
+      return timeB - timeA;
+    });
+  }, [showAllStorageVideos, storedVideos, avatarVideos]);
   
   // Scenarios preview states
   const [previewScenario, setPreviewScenario] = useState<'greeting' | 'interaction' | 'scanner'>('interaction');
@@ -2753,7 +2925,11 @@ export const AvataresAdminPanel: React.FC<{ user: any }> = ({ user }) => {
               url: `https://stqthrzbvuqcavtsonba.supabase.co/storage/v1/object/public/newbankVideoAnimadoAvatar/${f.name}`,
               created_at: f.created_at
             }))
-            .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+            .sort((a: any, b: any) => {
+              const timeA = getVideoTimestamp(a.name, a.created_at);
+              const timeB = getVideoTimestamp(b.name, b.created_at);
+              return timeB - timeA;
+            });
           setStoredVideos(videos);
         }
       }
@@ -3692,8 +3868,13 @@ export const AvataresAdminPanel: React.FC<{ user: any }> = ({ user }) => {
                                 👁️ Abrir
                               </span>
                             </div>
+                            {getVideoTimestamp(video.name, video.created_at) > 0 && (
+                              <p className="text-[8px] font-medium text-slate-400">
+                                🕒 {new Date(getVideoTimestamp(video.name, video.created_at)).toLocaleDateString('es-SV', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            )}
                             
-                            <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+                            <div className="flex items-center gap-1.5 pt-0.5" onClick={e => e.stopPropagation()}>
                               <button
                                 onClick={async () => {
                                   const updated = { ...selectedAvatar, video_url: video.url };
@@ -3811,7 +3992,9 @@ export const AvataresAdminPanel: React.FC<{ user: any }> = ({ user }) => {
                     {previewModalVideo.name}
                   </h4>
                   <p className="text-[10px] text-slate-400 font-medium truncate">
-                    Reproducción, información y disparadores del video
+                    {getVideoTimestamp(previewModalVideo.name, previewModalVideo.created_at) > 0 
+                      ? `Creado: ${new Date(getVideoTimestamp(previewModalVideo.name, previewModalVideo.created_at)).toLocaleDateString('es-SV', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`
+                      : "Reproducción, información y disparadores del video"}
                   </p>
                 </div>
               </div>

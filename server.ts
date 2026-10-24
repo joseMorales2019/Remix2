@@ -416,7 +416,8 @@ async function startServer() {
         } else if (elapsed < 9) {
           return res.json({ status: "in-progress", progress: 85, progress_text: "Finalizando renderizado de video HD..." });
         } else {
-          const mockVideoUrl = "https://stqthrzbvuqcavtsonba.supabase.co/storage/v1/object/public/newbankVideoAnimadoAvatar/grok-avatar-poll-212dec46-b74b-99f2-a7f4-e23fd89c6e97-1781925879009.mp4";
+          const defaultRefUrl = "https://stqthrzbvuqcavtsonba.supabase.co/storage/v1/object/public/newbankVideoAnimadoAvatar/grok-avatar-poll-24b7beb5-c254-9d02-8f7d-cb8def91ef69-1781158077699.mp4";
+          const mockVideoUrl = defaultRefUrl;
           
           // Save to greeting_videos if username is provided
           if (username) {
