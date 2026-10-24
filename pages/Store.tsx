@@ -956,6 +956,30 @@ const Store: React.FC<{ user: any }> = ({ user }) => {
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <h2 className="text-xl sm:text-2xl font-black text-slate-900 uppercase tracking-tighter leading-none mb-1">{hoveredProduct.name}</h2>
+                  <div className="flex items-center gap-3 my-2">
+                    <div className="flex items-center text-amber-400 text-xs">
+                      {Array.from({ length: (function(id: string) {
+                        let hash = 0;
+                        for (let i = 0; i < (id || '').length; i++) {
+                          hash = (hash << 5) - hash + id.charCodeAt(i);
+                          hash |= 0;
+                        }
+                        return 3 + (Math.abs(hash) % 3);
+                      })(hoveredProduct.id) }).map((_, i) => (
+                        <span key={i}>⭐</span>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-1 bg-red-50 text-red-600 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tight">
+                      <span>🔥</span> {(function(id: string) {
+                        let hash = 0;
+                        for (let i = 0; i < (id || '').length; i++) {
+                          hash = (hash << 5) - hash + id.charCodeAt(i);
+                          hash |= 0;
+                        }
+                        return (1240 + (Math.abs(hash) % 3760)).toLocaleString();
+                      })(hoveredProduct.id)} vistas • Alta demanda
+                    </div>
+                  </div>
                   <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded-full">Detalles del Producto</span>
                 </div>
                 <button onClick={handleMouseLeave} className="p-1.5 hover:bg-slate-100 rounded-full transition-colors">
@@ -1224,6 +1248,32 @@ const Store: React.FC<{ user: any }> = ({ user }) => {
                 </h3>
                 <p className="text-[9px] sm:text-xs text-slate-400 font-medium mb-1 line-clamp-1">{product.description}</p>
                 
+                {/* Estrellas y Vistas / Alta Demanda */}
+                <div className="flex items-center justify-between gap-1 my-1.5 flex-wrap">
+                  <div className="flex items-center text-amber-400 text-xs">
+                    {Array.from({ length: (function(id: string) {
+                      let hash = 0;
+                      for (let i = 0; i < (id || '').length; i++) {
+                        hash = (hash << 5) - hash + id.charCodeAt(i);
+                        hash |= 0;
+                      }
+                      return 3 + (Math.abs(hash) % 3);
+                    })(product.id) }).map((_, i) => (
+                      <span key={i}>⭐</span>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-1 bg-red-50 text-red-600 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tight">
+                    <span>🔥</span> {(function(id: string) {
+                      let hash = 0;
+                      for (let i = 0; i < (id || '').length; i++) {
+                        hash = (hash << 5) - hash + id.charCodeAt(i);
+                        hash |= 0;
+                      }
+                      return (1240 + (Math.abs(hash) % 3760)).toLocaleString();
+                    })(product.id)} vistas • Alta demanda
+                  </div>
+                </div>
+
                 {/* Información de Envío Gratis */}
                 {product.creator?.free_shipping_departments && product.creator.free_shipping_departments.length > 0 && (
                   <div className="mb-2">
