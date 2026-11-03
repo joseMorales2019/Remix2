@@ -433,11 +433,11 @@ const Gallery: React.FC<{ user: any }> = ({ user }) => {
               <div className="h-px bg-blue-100 flex-grow"></div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 sm:gap-10">
-              {projects.filter(p => String(p.creator_id) === String(user?.id) || !p.creator_id).map((p) => {
+              {projects.filter(p => String(p.creator_id) === String(user?.id) || !p.creator_id).map((p, idx) => {
                 const vote = votes[p.id] || { up: 0, down: 0 };
                 const rating = Math.min(5, Math.max(3, 3 + (vote.up - vote.down) / 5));
                 return (
-                  <div key={p.id} className="flex flex-col group animate-fade-in">
+                  <div key={`my-proj-${p.id || idx}-${idx}`} className="flex flex-col group animate-fade-in">
                     <div onClick={() => setSearchParams({ id: p.id })} className="relative mb-4 overflow-hidden rounded-2xl aspect-[3/4] shadow-md group-hover:shadow-2xl transition-all duration-300 cursor-pointer">
                       <img 
                         src={p.cover_image_url || "https://images.unsplash.com/photo-1553729459-efe14ef6055d?q=80&w=1770&auto=format&fit=crop"} 
@@ -462,7 +462,7 @@ const Gallery: React.FC<{ user: any }> = ({ user }) => {
                       
                       <div className="flex items-center gap-1 mb-2">
                         {[1, 2, 3, 4, 5].map((star) => (
-                          <span key={star} className={`text-xs ${star <= rating ? 'text-orange-400' : 'text-slate-200'}`}>★</span>
+                          <span key={`my-star-${p.id || idx}-${star}`} className={`text-xs ${star <= rating ? 'text-orange-400' : 'text-slate-200'}`}>★</span>
                         ))}
                         <span className="text-[10px] font-bold text-blue-500 ml-1">({vote.up})</span>
                       </div>
@@ -487,12 +487,12 @@ const Gallery: React.FC<{ user: any }> = ({ user }) => {
 
         {/* The Grid (Amazon Bookshelf Layout) - Only Public Projects */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 sm:gap-10">
-          {projects.filter(p => (p.project_visibility || 'public') === 'public').map((p) => {
+          {projects.filter(p => (p.project_visibility || 'public') === 'public').map((p, idx) => {
             const vote = votes[p.id] || { up: 0, down: 0 };
             const rating = Math.min(5, Math.max(3, 3 + (vote.up - vote.down) / 5)); // Simulación de estrellas
 
             return (
-              <div key={p.id} className="flex flex-col group animate-fade-in">
+              <div key={`pub-proj-${p.id || idx}-${idx}`} className="flex flex-col group animate-fade-in">
                 <div onClick={() => setSearchParams({ id: p.id })} className="relative mb-4 overflow-hidden rounded-2xl aspect-[3/4] shadow-md group-hover:shadow-2xl transition-all duration-300 cursor-pointer">
                   <img 
                     src={p.cover_image_url || "https://images.unsplash.com/photo-1553729459-efe14ef6055d?q=80&w=1770&auto=format&fit=crop"} 
@@ -518,7 +518,7 @@ const Gallery: React.FC<{ user: any }> = ({ user }) => {
                   {/* "Star Rating" (Simulated based on votes) */}
                   <div className="flex items-center gap-1 mb-2">
                     {[1, 2, 3, 4, 5].map((star) => (
-                      <span key={star} className={`text-xs ${star <= rating ? 'text-orange-400' : 'text-slate-200'}`}>★</span>
+                      <span key={`pub-star-${p.id || idx}-${star}`} className={`text-xs ${star <= rating ? 'text-orange-400' : 'text-slate-200'}`}>★</span>
                     ))}
                     <span className="text-[10px] font-bold text-blue-500 ml-1">({vote.up})</span>
                   </div>

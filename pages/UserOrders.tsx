@@ -154,7 +154,7 @@ const UserOrders: React.FC<UserOrdersProps> = ({ user }) => {
             ) : (
               filteredOrders.map((order, idx) => (
                 <motion.div
-                  key={order.id}
+                  key={`user-order-${order.id || idx}-${idx}`}
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: idx * 0.1 }}
@@ -251,7 +251,7 @@ const UserOrders: React.FC<UserOrdersProps> = ({ user }) => {
                                 const isActive = !!order[step.field];
                                 return (
                                   <div
-                                    key={step.id}
+                                    key={`user-track-${order.id}-${step.id}`}
                                     className={`flex items-center justify-between p-4 rounded-2xl border-2 transition-all ${
                                       isActive 
                                         ? 'bg-green-50 border-green-100 text-green-700 shadow-sm' 

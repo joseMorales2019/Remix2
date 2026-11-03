@@ -198,9 +198,9 @@ const SmartSlideMenu: React.FC<{ user: any; onSignOut: () => void }> = ({ user, 
           </div>
 
           <div className="hidden md:flex items-center space-x-1 lg:space-x-2">
-            {navLinks.filter(l => l.category === 'Navegación' || (user?.is_admin && l.category === 'Gestión' && l.label === 'Gestión')).map((link) => (
+            {navLinks.filter(l => l.category === 'Navegación' || (user?.is_admin && l.category === 'Gestión' && l.label === 'Gestión')).map((link, idx) => (
               <Link 
-                key={link.to} 
+                key={`nav-link-${link.to}-${idx}`} 
                 to={link.to}
                 className={`px-3 py-2 rounded-xl text-xs lg:text-sm font-bold transition-all ${
                   location.pathname === link.to 
@@ -338,9 +338,9 @@ const SmartSlideMenu: React.FC<{ user: any; onSignOut: () => void }> = ({ user, 
                 {category}
               </h3>
               <div className="space-y-1">
-                {links.map((link: any) => (
+                {links.map((link: any, idx: number) => (
                   <Link 
-                    key={link.to} 
+                    key={`menu-${category}-${link.to}-${idx}`} 
                     to={link.to}
                     className={`flex items-center space-x-4 p-4 rounded-2xl transition-all font-bold text-sm ${
                       location.pathname === link.to 

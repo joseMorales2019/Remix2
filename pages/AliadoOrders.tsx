@@ -191,7 +191,7 @@ const AliadoOrders: React.FC<AliadoOrdersProps> = ({ user }) => {
             ) : (
               filteredOrders.map((order, idx) => (
                 <motion.div
-                  key={order.id}
+                  key={`aliado-order-${order.id || idx}-${idx}`}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.1 }}
@@ -282,7 +282,7 @@ const AliadoOrders: React.FC<AliadoOrdersProps> = ({ user }) => {
                             
                             return (
                               <button
-                                key={step.id}
+                                key={`aliado-track-${order.id}-${step.id}`}
                                 disabled={updatingId === order.id || isActive || !canActivate}
                                 onClick={() => updateTracking(order.id, step.id)}
                                 className={`flex items-center justify-between p-4 rounded-2xl text-[10px] font-black uppercase tracking-tight transition-all border-2 ${

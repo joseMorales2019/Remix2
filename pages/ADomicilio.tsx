@@ -2167,9 +2167,9 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                             <span>Envío</span>
                           </div>
 
-                          {bizProducts.map((p) => (
+                          {bizProducts.map((p, pIdx) => (
                             <div
-                              key={p.id}
+                              key={`biz-prod-${p.id || pIdx}-${pIdx}`}
                               className="flex items-center justify-between p-1.5 rounded-lg bg-amber-50/40 hover:bg-amber-100/50 border border-amber-100 transition text-[10px]"
                             >
                               <div className="flex items-center gap-1.5 min-w-0">
@@ -2873,9 +2873,9 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                   <div className="space-y-3">
                     {products
                       .filter((p) => p.business_id === managingBiz.id)
-                      .map((p) => (
+                      .map((p, pIdx) => (
                         <div
-                          key={p.id}
+                          key={`manage-prod-${p.id || pIdx}-${pIdx}`}
                           className={`p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition ${
                             p.is_hidden ? 'bg-stone-100/70 border-stone-300 opacity-75' : 'bg-white border-amber-200/80 shadow-xs'
                           }`}
@@ -3538,11 +3538,11 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                   {products
                     .filter((p) => p.business_id === biz.id && !p.is_hidden)
                     .filter((p) => (deliveryType === 'domicilio' ? p.disponible_domicilio : true))
-                    .map((p) => {
+                    .map((p, pIdx) => {
                       const qty = cart[p.id] || 0;
                       return (
                         <div
-                          key={p.id}
+                          key={`cart-modal-prod-${p.id || pIdx}-${pIdx}`}
                           className="bg-white p-2.5 rounded-xl border border-amber-200/80 space-y-2"
                         >
                           <div className="flex items-center justify-between">
@@ -4399,9 +4399,9 @@ export const ADomicilio: React.FC<ADomicilioProps> = ({ user }) => {
                       {products
                         .filter(p => p.business_id === managingBiz.id && !p.is_hidden)
                         .slice(0, 6)
-                        .map((p) => (
+                        .map((p, pIdx) => (
                           <div
-                            key={p.id}
+                            key={`poster-prod-${p.id || pIdx}-${pIdx}`}
                             className="bg-white/10 backdrop-blur-md rounded-2xl p-3 border border-white/15 flex flex-col justify-between shadow-md"
                           >
                             <div className="relative aspect-square rounded-xl overflow-hidden mb-2 bg-stone-800">

@@ -62,29 +62,57 @@ const ITTools: React.FC<{ user: any }> = ({ user }) => {
   const [editingEquipment, setEditingEquipment] = useState<ITEquipment | null>(null);
 
   useEffect(() => {
-    fetchCompanies();
-  }, []);
+    if (user?.id) {
+      fetchCompanies();
+    }
+  }, [user]);
 
   const fetchCompanies = async () => {
     setLoading(true);
-    const { data } = await supabase.from('it_companies').select('*').order('created_at', { ascending: false });
+    if (!user?.id) {
+      setCompanies([]);
+      setLoading(false);
+      return;
+    }
+    const { data } = await supabase.from('it_companies').select('*').eq('owner_id', user.id).order('created_at', { ascending: false });
     if (data) setCompanies(data);
     setLoading(false);
   };
 
   const fetchAllEquipment = async () => {
     setLoading(true);
-    const { data } = await supabase.from('it_equipment').select('*').order('created_at', { ascending: false });
+    if (!user?.id) {
+      setAllEquipment([]);
+      setLoading(false);
+      return;
+    }
+    const { data: userComps } = await supabase.from('it_companies').select('id').eq('owner_id', user.id);
+    const companyIds = userComps ? userComps.map(c => c.id) : [];
+
+    if (companyIds.length === 0) {
+      setAllEquipment([]);
+      setLoading(false);
+      return;
+    }
+
+    const { data } = await supabase.from('it_equipment').select('*').in('company_id', companyIds).order('created_at', { ascending: false });
     if (data) setAllEquipment(data);
     setLoading(false);
   };
 
   const fetchCompanyData = async (company: ITCompany) => {
     setLoading(true);
-    const { data: comp } = await supabase.from('it_companies').select('*').eq('id', company.id).single();
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
+    const { data: comp } = await supabase.from('it_companies').select('*').eq('id', company.id).eq('owner_id', user.id).single();
     if (comp) {
       setSelectedCompany(comp);
       setCompanies(prev => prev.map(c => c.id === comp.id ? comp : c));
+    } else {
+      setLoading(false);
+      return;
     }
     const { data: secs } = await supabase.from('it_sections').select('*').eq('company_id', company.id);
     const { data: equ } = await supabase.from('it_equipment').select('*').eq('company_id', company.id);
@@ -94,7 +122,7 @@ const ITTools: React.FC<{ user: any }> = ({ user }) => {
   };
 
   const handleCreateCompany = async () => {
-    if (!newCompanyName) return;
+    if (!newCompanyName || !user?.id) return;
     const { error } = await supabase.from('it_companies').insert([{ name: newCompanyName, owner_id: user.id }]);
     if (!error) {
       setNewCompanyName('');

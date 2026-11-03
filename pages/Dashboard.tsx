@@ -1293,10 +1293,10 @@ const Dashboard: React.FC<{ user: any }> = ({ user }) => {
                         }
                         return 3 + (Math.abs(hash) % 3);
                       })(hoveredProduct.id) }).map((_, i) => (
-                        <span key={i}>⭐</span>
+                        <span key={`modal-star-${hoveredProduct.id}-${i}`}>⭐</span>
                       ))}
                     </div>
-                    <div className="flex items-center gap-1 bg-red-50 text-red-600 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tight">
+                    <div className="flex items-center gap-1 bg-red-50 text-red-600 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tight">
                       <span>🔥</span> {(function(id: string) {
                         let hash = 0;
                         for (let i = 0; i < (id || '').length; i++) {
@@ -1355,7 +1355,7 @@ const Dashboard: React.FC<{ user: any }> = ({ user }) => {
                     <p className="text-[9px] text-slate-400 italic">Sé el primero en comentar sobre este producto.</p>
                   ) : (
                     productComments[hoveredProduct.id].map((c, i) => (
-                      <div key={i} className="bg-slate-50 p-2 rounded-xl text-[9px] sm:text-xs text-slate-700 font-medium border border-slate-100">
+                      <div key={`modal-cmt-${hoveredProduct.id}-${i}`} className="bg-slate-50 p-2 rounded-xl text-[9px] sm:text-xs text-slate-700 font-medium border border-slate-100">
                         {c}
                       </div>
                     ))
@@ -1601,7 +1601,7 @@ const Dashboard: React.FC<{ user: any }> = ({ user }) => {
                   animate={isPlaying ? { opacity: 1, scale: 1 } : false}
                   exit={isPlaying ? { opacity: 0, scale: 0.95 } : undefined}
                   transition={{ duration: 0.4, ease: "easeInOut" }}
-                  key={isPlaying ? `anim-${product.id}-${index}` : product.id} 
+                  key={isPlaying ? `anim-${product.id}-${index}` : `prod-${product.id}-${index}`} 
                   id={`product-card-${product.id}`}
                   className={`bg-white rounded-2xl shadow-sm hover:shadow-xl overflow-hidden border border-slate-100 flex flex-col group transition-all duration-500 z-0 hover:z-10 ${isPlaying && index === 3 ? 'lg:hidden' : ''}`}
                 >
@@ -1650,7 +1650,7 @@ const Dashboard: React.FC<{ user: any }> = ({ user }) => {
                         }
                         return 3 + (Math.abs(hash) % 3);
                       })(product.id) }).map((_, i) => (
-                        <span key={i}>⭐</span>
+                        <span key={`star-${product.id}-${i}`}>⭐</span>
                       ))}
                     </div>
                     <div className="flex items-center gap-1 bg-red-50 text-red-600 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tight">
@@ -1678,7 +1678,7 @@ const Dashboard: React.FC<{ user: any }> = ({ user }) => {
                   <div className="my-2 pt-2 border-t border-slate-100">
                     <div className="max-h-20 overflow-y-auto space-y-1 mb-1 elegant-scrollbar">
                       {(productComments[product.id] || []).map((c, i) => (
-                        <p key={i} className="text-[8px] sm:text-[9px] text-slate-600 bg-slate-50 p-1 rounded-lg font-medium">
+                        <p key={`cmt-${product.id}-${i}`} className="text-[8px] sm:text-[9px] text-slate-600 bg-slate-50 p-1 rounded-lg font-medium">
                           {c}
                         </p>
                       ))}
@@ -1784,8 +1784,8 @@ const Dashboard: React.FC<{ user: any }> = ({ user }) => {
           <button type="submit" disabled={isPosting} className="bg-slate-900 text-white py-4 rounded-xl font-black uppercase text-xs">{isPosting ? 'Enviando...' : 'Publicar Testimonio'}</button>
         </form>
         <div className="space-y-8">
-          {comments.map(c => (
-            <div key={c.id} className="bg-white p-8 rounded-[2.5rem] border shadow-sm">
+          {comments.map((c, idx) => (
+            <div key={`dash-cmt-${c.id || idx}-${idx}`} className="bg-white p-8 rounded-[2.5rem] border shadow-sm">
               <div className="flex justify-between items-start mb-4">
                 <div className="font-black uppercase text-sm">{c.author_name}</div>
                 <div className="text-[9px] font-black opacity-30 uppercase">{new Date(c.created_at).toLocaleDateString()}</div>

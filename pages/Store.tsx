@@ -966,7 +966,7 @@ const Store: React.FC<{ user: any }> = ({ user }) => {
                         }
                         return 3 + (Math.abs(hash) % 3);
                       })(hoveredProduct.id) }).map((_, i) => (
-                        <span key={i}>⭐</span>
+                        <span key={`modal-star-${hoveredProduct.id}-${i}`}>⭐</span>
                       ))}
                     </div>
                     <div className="flex items-center gap-1 bg-red-50 text-red-600 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-tight">
@@ -1222,7 +1222,7 @@ const Store: React.FC<{ user: any }> = ({ user }) => {
                 animate={isPlaying ? { opacity: 1, scale: 1 } : false}
                 exit={isPlaying ? { opacity: 0, scale: 0.95 } : undefined}
                 transition={{ duration: 0.4, ease: "easeInOut" }}
-                key={isPlaying ? `anim-${product.id}-${index}` : product.id} 
+                key={isPlaying ? `anim-${product.id}-${index}` : `prod-${product.id}-${index}`} 
                 id={`product-card-${product.id}`}
                 className={`bg-white rounded-2xl shadow-sm hover:shadow-xl overflow-hidden border border-slate-100 flex flex-col group transition-all duration-500 z-0 hover:z-10 ${isPlaying && index === 3 ? 'lg:hidden' : ''}`}
               >
@@ -1259,7 +1259,7 @@ const Store: React.FC<{ user: any }> = ({ user }) => {
                       }
                       return 3 + (Math.abs(hash) % 3);
                     })(product.id) }).map((_, i) => (
-                      <span key={i}>⭐</span>
+                      <span key={`star-${product.id}-${i}`}>⭐</span>
                     ))}
                   </div>
                   <div className="flex items-center gap-1 bg-red-50 text-red-600 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tight">
