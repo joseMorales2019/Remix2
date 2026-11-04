@@ -11,6 +11,7 @@ import xss from "xss";
 import nodemailer from "nodemailer";
 import { GoogleGenAI } from "@google/genai";
 import { createClient } from "@supabase/supabase-js";
+import { registerRouletteRoutes } from "./services/rouletteBackend";
 
 async function retryWithExponentialBackoff<T>(
   fn: () => Promise<T>,
@@ -123,6 +124,9 @@ async function startServer() {
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
   });
+
+  // Mount Probar mi suerte (Roulette) endpoints
+  registerRouletteRoutes(app, io);
 
   // ========================================
   // XAI GROK IMAGINE VIDEO API INTENT

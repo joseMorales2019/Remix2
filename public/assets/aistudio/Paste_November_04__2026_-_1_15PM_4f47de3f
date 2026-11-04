@@ -1,0 +1,770 @@
+# IMPLEMENTACIÓN DEL MÓDULO «PROBAR MI SUERTE» – NEWBANK STORE
+
+## 1. INSTRUCCIÓN PRINCIPAL Y REGLAS DE IMPLEMENTACIÓN
+
+Implementa una nueva funcionalidad integral dentro de la plataforma **Newbank Store (https://www.newbank.store)**, denominada **«Probar mi suerte»**, incorporando un sistema interactivo de ruleta de premios, administración de regalos, configuración de probabilidades, gestión de inventario y seguimiento de premios entregados a los usuarios.
+
+**REGLA FUNDAMENTAL:**
+
+- No eliminar, modificar, reemplazar ni alterar ninguna funcionalidad, componente, sección, diseño, ruta, proceso, estructura de datos o lógica de negocio existente.
+- No modificar los módulos actuales de la tienda, productos, carrito, compras, pagos, usuarios, autenticación, donaciones, perfil, préstamos, ahorros ni administración.
+- No realizar refactorizaciones generales ni modificaciones que no sean estrictamente necesarias para incorporar esta funcionalidad.
+- Mantener la identidad visual, arquitectura, tecnologías, convenciones de programación y estructura del proyecto.
+- Reutilizar los componentes, servicios, autenticación, base de datos y mecanismos de seguridad existentes cuando sea posible.
+- Las nuevas funcionalidades deben integrarse de manera modular, independiente y escalable.
+- No utilizar información simulada ni datos ficticios en producción.
+- No dejar botones decorativos, acciones sin implementar, formularios que no guarden información ni funcionalidades incompletas.
+
+Antes de comenzar, inspecciona la arquitectura actual del proyecto, identifica las rutas, componentes, servicios, modelos, mecanismos de autenticación, permisos y estructura de base de datos. Posteriormente, implementa exclusivamente los elementos necesarios para cumplir los siguientes requerimientos.
+
+---
+
+# 2. NUEVA SECCIÓN PARA LOS USUARIOS: «PROBAR MI SUERTE»
+
+## 2.1. Ubicación dentro de la navegación
+
+Incorporar una nueva sección denominada **Probar mi suerte** en el menú principal del usuario.
+
+Debe ubicarse exactamente entre:
+
+1. Donar a Ancianos.
+2. Probar mi suerte. (Nueva sección).
+3. Mi Perfil.
+
+Mantener intactos los accesos existentes.
+
+La nueva sección debe disponer de:
+
+- Icono representativo de una ruleta o premio.
+- Nombre: Probar mi suerte.
+- Navegación funcional.
+- Diseño adaptable a dispositivos móviles, tabletas y computadoras.
+- Indicador visual cuando el usuario tenga premios pendientes de reclamar.
+
+## 2.2. Diseño de la experiencia de usuario
+
+Desarrollar una experiencia visual moderna, atractiva y orientada al entretenimiento, utilizando principios actuales de diseño UX/UI.
+
+La interfaz debe transmitir una experiencia de juego promocional, sin perder la identidad visual de Newbank Store.
+
+Utilizar:
+
+- Diseño moderno y minimalista.
+- Tarjetas con esquinas redondeadas.
+- Sombras suaves.
+- Gradientes elegantes.
+- Microinteracciones.
+- Animaciones fluidas.
+- Indicadores visuales de premios.
+- Iconografía intuitiva.
+- Tipografía legible.
+- Contraste adecuado.
+- Retroalimentación visual inmediata.
+- Transiciones suaves entre estados.
+
+La interfaz debe ser completamente responsive y mantener una excelente experiencia tanto en dispositivos móviles como en escritorio.
+
+## 2.3. Ruleta interactiva flotante
+
+Crear una ruleta gráfica circular, visualmente atractiva y completamente funcional.
+
+La ruleta debe:
+
+- Estar centrada en la pantalla.
+- Adaptarse automáticamente al tamaño del dispositivo.
+- Mostrar los productos configurados por el administrador.
+- Mostrar las opciones comodín habilitadas.
+- Incorporar imágenes de los regalos cuando estén disponibles.
+- Mostrar nombres de premios y opciones de manera legible.
+- Diferenciar visualmente los premios de las opciones comodín.
+- Incorporar un indicador o puntero fijo.
+- Tener un botón central o inferior denominado «GIRAR».
+- Mostrar una animación de giro fluida, con aceleración y desaceleración.
+- Evitar desbordamientos horizontales.
+- Mantener una presentación visual equilibrada.
+
+Cuando la pantalla sea pequeña, adaptar el tamaño de la ruleta y utilizar textos e iconos que sigan siendo legibles.
+
+## 2.4. Funcionamiento del botón GIRAR
+
+Cuando el usuario presione «GIRAR»:
+
+1. Validar que el usuario tenga autorización para participar.
+2. Verificar que la ruleta esté activa.
+3. Verificar que el usuario cumpla las condiciones de participación.
+4. Comprobar que no tenga una participación bloqueada por el tiempo de espera.
+5. Solicitar al servidor la resolución de la participación.
+6. El servidor determinará el resultado utilizando las probabilidades y configuraciones vigentes.
+7. El resultado será enviado al cliente.
+8. La ruleta ejecutará la animación correspondiente hasta detenerse exactamente en el resultado determinado por el servidor.
+9. Mostrar el resultado mediante una ventana o tarjeta animada.
+
+**IMPORTANTE:** La animación no debe determinar el resultado. El resultado debe ser calculado y validado en el servidor para impedir manipulaciones desde el navegador.
+
+No permitir múltiples solicitudes simultáneas ni giros duplicados por doble clic, recarga de página o manipulación de solicitudes.
+
+## 2.5. Resultados posibles
+
+La ruleta tendrá tres tipos de resultados:
+
+### A. Ganador de un regalo
+
+Cuando el resultado corresponda a un producto:
+
+Mostrar una tarjeta de celebración con el siguiente contenido:
+
+**¡FELICIDADES!**
+
+Has ganado:
+
+[Imagen del regalo]
+
+**Nombre del regalo**
+
+Fecha del premio: día, mes y año.
+
+Hora: hora local.
+
+Código de premio: identificador único.
+
+Número de contacto para reclamarlo: [Número telefónico configurado por el propietario].
+
+Estado: **Pendiente de reclamar**.
+
+Incluir una indicación:
+
+«Comunícate con el propietario de Newbank Store para coordinar la entrega de tu premio. Presenta tu código de premio para facilitar su identificación».
+
+El premio debe registrarse automáticamente en la base de datos y aparecer en la sección de premios ganados del usuario.
+
+No permitir que un mismo premio sea asignado a más de un usuario cuando el inventario disponible sea limitado.
+
+### B. Comodín: Tienes un intento más
+
+Cuando el resultado sea:
+
+**¡TIENES UN INTENTO MÁS!**
+
+Mostrar un mensaje animado que indique que el usuario tiene una oportunidad adicional.
+
+Al presionar «VOLVER A GIRAR»:
+
+- Permitir un nuevo giro adicional.
+- No descontar una participación de pago adicional.
+- Aplicar la regla especial de repetición establecida por el sistema.
+- El siguiente resultado deberá ser seleccionado aleatoriamente entre:
+  - Tienes un intento más.
+  - Gracias por participar.
+
+Este segundo giro especial no podrá generar premios.
+
+Después del resultado, continuar según las reglas correspondientes al comodín obtenido.
+
+Evitar que se genere una cadena ilimitada de intentos adicionales.
+
+### C. Comodín: Gracias por participar
+
+Mostrar una ventana con el mensaje:
+
+**¡Gracias por participar!**
+
+«Hoy puede que no hayas ganado un regalo, pero todavía puedes probar tu suerte».
+
+Mostrar las siguientes opciones:
+
+- «Comprar kit Personal».
+- «Probar mi suerte en 1 hora».
+
+La primera opción debe dirigir al producto o proceso de compra del Kit Personal existente en la tienda.
+
+La segunda opción debe mostrar el tiempo restante para volver a participar.
+
+Al finalizar la interacción, cerrar la ruleta y regresar al dashboard, manteniendo intacto su contenido y estado.
+
+---
+
+# 3. NUEVO MÓDULO ADMINISTRATIVO: REGALOS
+
+## 3.1. Ubicación
+
+Dentro de la sección de gestión administrativa **Consola de Control**, en el apartado:
+
+**Administración de Préstamos y Ahorros.**
+
+Incorporar, junto a la sección Tienda, una nueva sección denominada:
+
+**Regalos**.
+
+No modificar la ubicación ni el funcionamiento de las secciones existentes.
+
+El nuevo módulo debe ser accesible exclusivamente para el propietario o los usuarios administrativos que tengan los permisos correspondientes.
+
+## 3.2. Dashboard administrativo de regalos
+
+Crear un panel administrativo con indicadores en tiempo real:
+
+- Total de regalos configurados.
+- Regalos disponibles.
+- Total de premios ganados.
+- Premios pendientes de reclamar.
+- Premios entregados.
+- Participaciones realizadas.
+- Estado de la ruleta.
+- Estado del modo imposible.
+
+Presentar los indicadores mediante tarjetas estadísticas y gráficos cuando aporten valor.
+
+Incorporar un diseño administrativo profesional, adaptable a dispositivos móviles.
+
+---
+
+# 4. CONFIGURACIÓN Y ADMINISTRACIÓN DE LA RULETA
+
+El propietario de la tienda debe disponer de controles completos para configurar la ruleta.
+
+## 4.1. Agregar productos existentes como regalos
+
+Permitir seleccionar productos que ya existen en el catálogo de Newbank Store.
+
+Mostrar:
+
+- Imagen del producto.
+- Nombre.
+- Precio de referencia.
+- Disponibilidad.
+- Cantidad de regalos asignada.
+- Probabilidad de ganar.
+
+Incorporar un buscador y filtros para localizar productos existentes.
+
+El administrador podrá seleccionar uno o varios productos y configurarlos como regalos.
+
+Al hacerlo, deberá especificar:
+
+1. Nombre del producto.
+2. Cantidad de unidades disponibles para regalar.
+3. Probabilidad de ganar expresada en porcentaje.
+4. Estado: activo o inactivo.
+
+**IMPORTANTE:** Seleccionar un producto como regalo no debe modificar su precio, inventario comercial, disponibilidad de venta ni configuración dentro de la tienda.
+
+El inventario promocional debe administrarse independientemente del inventario comercial.
+
+## 4.2. Agregar regalos nuevos
+
+Incorporar un formulario para registrar regalos que no necesariamente formen parte del catálogo comercial.
+
+Campos obligatorios:
+
+- Imagen del regalo.
+- Nombre del regalo.
+- Descripción opcional.
+- Cantidad total de regalos disponibles.
+- Probabilidad de ganar.
+- Estado: activo o inactivo.
+
+Permitir cargar imágenes desde el dispositivo.
+
+Las imágenes deben almacenarse utilizando el servicio de almacenamiento existente, conservando únicamente su referencia en la base de datos.
+
+Permitir editar, desactivar y consultar los regalos registrados.
+
+No eliminar el historial de premios cuando un regalo sea desactivado o modificado.
+
+## 4.3. Administración de cantidades
+
+El sistema debe llevar un control independiente de:
+
+- Cantidad inicial.
+- Cantidad disponible.
+- Cantidad reservada, cuando corresponda.
+- Cantidad ganada.
+- Cantidad entregada.
+
+La cantidad disponible nunca debe ser negativa.
+
+Cuando se alcance el límite de unidades disponibles, el regalo deberá dejar de participar automáticamente en la ruleta.
+
+Si el administrador modifica la cantidad disponible, el sistema deberá validar que la modificación no contradiga premios previamente asignados.
+
+---
+
+# 5. CONFIGURACIÓN DE PROBABILIDADES
+
+El administrador podrá definir la probabilidad de obtener cada regalo.
+
+Ejemplo ilustrativo:
+
+- Regalo A: 5 %.
+- Regalo B: 10 %.
+- Regalo C: 15 %.
+- Tienes un intento más: 20 %.
+- Gracias por participar: 50 %.
+
+Estos valores son configurables y no deben quedar establecidos permanentemente en el código.
+
+El sistema debe:
+
+1. Validar que las probabilidades sean valores numéricos.
+2. Impedir valores negativos.
+3. Impedir probabilidades superiores a 100 %.
+4. Validar que la distribución de resultados sea matemáticamente consistente.
+5. Normalizar los resultados únicamente cuando el diseño de configuración lo permita expresamente.
+6. Excluir automáticamente los regalos agotados.
+7. Recalcular las probabilidades efectivas cuando cambie la disponibilidad.
+8. Garantizar que las probabilidades configuradas se correspondan con los resultados reales.
+
+**Regla de integridad:** El sistema debe conservar una distribución de probabilidades válida. Si se configuran porcentajes que no suman 100 %, mostrar una advertencia y no permitir activar la ruleta hasta corregirlos o confirmar explícitamente una estrategia de normalización.
+
+Registrar la configuración aplicada en cada participación para permitir auditorías posteriores.
+
+---
+
+# 6. OPCIONES COMODÍN
+
+Crear un apartado independiente para configurar las opciones comodín.
+
+## 6.1. Tienes un intento más
+
+Permitir activar o desactivar esta opción.
+
+Cuando esté habilitada:
+
+- Aparecerá como una sección de la ruleta.
+- Tendrá una probabilidad configurable.
+- Al resultar seleccionada, otorgará un único giro adicional especial.
+- El giro adicional solo podrá resultar en Tienes un intento más o Gracias por participar.
+- No podrá generar un premio.
+- No permitirá encadenar oportunidades ilimitadas.
+
+## 6.2. Gracias por participar
+
+Permitir activar o desactivar esta opción.
+
+Cuando esté habilitada:
+
+- Aparecerá como una sección de la ruleta.
+- Tendrá una probabilidad configurable.
+- Mostrará el mensaje de agradecimiento.
+- Ofrecerá comprar el Kit Personal.
+- Permitirá consultar el tiempo restante para la próxima participación.
+
+## 6.3. Modo imposible
+
+Incorporar un interruptor administrativo:
+
+**ACTIVAR MODO IMPOSIBLE**
+
+Al activar esta opción:
+
+- Ningún usuario podrá ganar regalos mientras permanezca habilitada.
+- Los productos podrán continuar apareciendo visualmente en la ruleta.
+- Los resultados reales estarán limitados exclusivamente a las opciones comodín.
+- Se conservarán las cantidades de regalos disponibles.
+- No se generarán registros de premios ganados.
+- Los usuarios no podrán alterar esta configuración desde el navegador.
+
+Incluir una confirmación antes de activar el modo.
+
+Mostrar claramente en el panel administrativo si está activo o inactivo.
+
+Registrar en el historial administrativo quién lo activó, cuándo y cuándo lo desactivó.
+
+**IMPORTANTE:** La apariencia de la ruleta no debe inducir al usuario a creer que puede ganar un premio cuando el modo imposible está activo. Mostrar una indicación clara y visible de que se trata de una modalidad promocional sin premios disponibles.
+
+---
+
+# 7. GESTIÓN DE PREMIOS GANADOS
+
+Dentro del módulo administrativo Regalos, incorporar un apartado:
+
+**Usuarios ganadores**.
+
+Mostrar una tabla administrativa con los siguientes campos:
+
+- Código del premio.
+- Nombre del usuario.
+- Correo electrónico.
+- Teléfono, cuando esté disponible.
+- Nombre del regalo ganado.
+- Imagen del regalo.
+- Fecha y hora del premio.
+- Estado.
+- Fecha de entrega.
+- Acciones.
+
+Estados disponibles:
+
+1. Pendiente de reclamar.
+2. Entregado.
+
+El administrador podrá:
+
+- Consultar los premios ganados.
+- Buscar por nombre o correo electrónico.
+- Filtrar por estado.
+- Filtrar por fecha.
+- Consultar el detalle del premio.
+- Marcar como entregado.
+- Consultar el historial de cambios.
+
+Cuando el administrador cambie el estado a «Entregado»:
+
+1. Guardar el cambio en la base de datos.
+2. Registrar la fecha y hora de entrega.
+3. Registrar al administrador responsable.
+4. Actualizar automáticamente el estado del premio en la cuenta del usuario.
+5. Reflejar el cambio sin necesidad de cerrar sesión.
+6. Mantener el registro histórico.
+
+No permitir modificar el estado de un premio sin registrar la operación.
+
+---
+
+# 8. SECCIÓN DEL USUARIO: MIS PREMIOS GANADOS
+
+Dentro de «Probar mi suerte», incorporar un apartado denominado:
+
+**Mis premios**.
+
+Mostrar todos los regalos que el usuario haya ganado.
+
+Cada tarjeta debe incluir:
+
+- Imagen del regalo.
+- Nombre del premio.
+- Código de premio.
+- Fecha y hora de obtención.
+- Número de contacto del propietario.
+- Estado del premio.
+- Fecha de entrega, cuando corresponda.
+
+Utilizar indicadores visuales diferenciados:
+
+- Pendiente de reclamar.
+- Entregado.
+
+La información deberá obtenerse directamente de la base de datos.
+
+Cuando el propietario actualice el estado de un premio, la modificación deberá reflejarse automáticamente en esta sección mediante el mecanismo de sincronización disponible.
+
+Un usuario solo podrá consultar sus propios premios.
+
+No permitir que pueda consultar, modificar o acceder a los premios de otros usuarios.
+
+---
+
+# 9. REGLAS DE PARTICIPACIÓN Y CONTROL DE TIEMPO
+
+Implementar un sistema de control de participaciones.
+
+Después de obtener el resultado «Gracias por participar», el usuario podrá volver a participar después de una hora.
+
+El sistema deberá:
+
+- Guardar la fecha y hora del último giro válido.
+- Calcular el tiempo restante desde el servidor.
+- Mostrar una cuenta regresiva.
+- Deshabilitar el botón GIRAR durante el periodo de espera.
+- Habilitarlo automáticamente al finalizar la hora.
+- Mantener el tiempo correctamente aunque el usuario cierre el navegador, cambie de dispositivo o cierre sesión.
+- Evitar que el usuario pueda modificar la hora de su dispositivo para adelantar su siguiente participación.
+
+El giro adicional especial concedido por «Tienes un intento más» deberá administrarse mediante un estado independiente y verificable.
+
+Definir claramente los estados de participación:
+
+- Disponible.
+- Girando.
+- Intento adicional disponible.
+- En periodo de espera.
+- Bloqueado administrativamente.
+
+Todas las validaciones deberán realizarse en el servidor.
+
+---
+
+# 10. BASE DE DATOS Y PERSISTENCIA
+
+Todas las configuraciones, participaciones, resultados, premios y cambios administrativos deberán almacenarse permanentemente en la base de datos existente.
+
+No utilizar localStorage como mecanismo principal de persistencia.
+
+Adaptar los modelos y tablas a la arquitectura actual.
+
+Como referencia funcional, contemplar las siguientes entidades:
+
+### A. gifts
+
+- id.
+- product_id (nullable).
+- name.
+- description.
+- image_url.
+- gift_type.
+- initial_quantity.
+- available_quantity.
+- won_quantity.
+- delivered_quantity.
+- probability.
+- is_active.
+- created_at.
+- updated_at.
+
+### B. roulette_settings
+
+- id.
+- is_active.
+- impossible_mode.
+- owner_phone.
+- personal_kit_product_id.
+- participation_cooldown_minutes.
+- configuration_version.
+- updated_at.
+
+### C. roulette_options
+
+- id.
+- option_type.
+- name.
+- probability.
+- is_active.
+- created_at.
+- updated_at.
+
+### D. roulette_participations
+
+- id.
+- user_id.
+- result_type.
+- result_id.
+- configuration_version.
+- probability_snapshot.
+- participation_type.
+- created_at.
+
+### E. gift_winners
+
+- id.
+- unique_code.
+- user_id.
+- gift_id.
+- gift_name_snapshot.
+- gift_image_snapshot.
+- status.
+- won_at.
+- delivered_at.
+- delivered_by.
+- created_at.
+- updated_at.
+
+### F. administrative_audit_logs
+
+- id.
+- administrator_id.
+- action.
+- entity_type.
+- entity_id.
+- previous_values.
+- new_values.
+- created_at.
+
+### G. user_roulette_status
+
+- id.
+- user_id.
+- next_available_at.
+- extra_attempt_available.
+- current_status.
+- updated_at.
+
+Estos modelos son una referencia conceptual. Antes de crearlos, verificar las estructuras existentes y reutilizar las tablas o colecciones actuales cuando corresponda.
+
+No duplicar información innecesariamente.
+
+Implementar relaciones, índices, restricciones, claves foráneas y políticas de seguridad.
+
+---
+
+# 11. SEGURIDAD Y CONSISTENCIA DE LAS OPERACIONES
+
+Implementar controles para proteger el sistema:
+
+- Autenticación obligatoria según las reglas actuales de Newbank Store.
+- Validación de permisos administrativos en el servidor.
+- Protección de operaciones administrativas.
+- Políticas de acceso a datos por usuario.
+- Validación de datos en frontend y backend.
+- Prevención de manipulación de probabilidades desde el cliente.
+- Prevención de giros duplicados.
+- Protección contra solicitudes concurrentes.
+- Protección contra asignación duplicada de regalos.
+- Registro de operaciones administrativas.
+- Validación de inventario dentro de transacciones atómicas.
+- Identificadores únicos para cada premio.
+- Protección de endpoints.
+- Manejo de errores sin exponer información interna.
+
+Cuando dos usuarios intenten ganar simultáneamente la última unidad de un regalo, el sistema debe garantizar que únicamente uno pueda obtenerla.
+
+Las operaciones de selección de premios, actualización de inventario y creación del registro de ganador deben ejecutarse de manera atómica.
+
+Utilizar mecanismos criptográficamente seguros para generar los resultados aleatorios en el servidor.
+
+---
+
+# 12. DISEÑO UX/UI Y EXPERIENCIA DE JUEGO
+
+Aplicar las siguientes directrices:
+
+### Diseño para usuarios
+
+- Ruleta atractiva y protagonista.
+- Animaciones optimizadas.
+- Botones grandes y accesibles.
+- Tarjetas de premios modernas.
+- Mensajes claros.
+- Indicadores de disponibilidad.
+- Cuenta regresiva visible.
+- Estados de carga.
+- Confirmaciones visuales.
+- Mensajes de error comprensibles.
+- Diseño adaptable a pantallas táctiles.
+
+### Diseño administrativo
+
+- Dashboard con indicadores.
+- Formularios organizados.
+- Tablas responsivas.
+- Buscadores y filtros.
+- Ventanas de confirmación.
+- Edición intuitiva.
+- Alertas de inventario bajo.
+- Indicadores de estado.
+- Historial de operaciones.
+
+### Accesibilidad y rendimiento
+
+- Contraste adecuado.
+- Navegación mediante teclado.
+- Etiquetas accesibles.
+- Compatibilidad con lectores de pantalla.
+- Respeto a la preferencia de movimiento reducido.
+- Optimización de imágenes.
+- Carga diferida cuando corresponda.
+- Evitar animaciones pesadas.
+- No bloquear la interfaz durante las operaciones del servidor.
+
+---
+
+# 13. FLUJOS DE FUNCIONAMIENTO
+
+Implementar y verificar los siguientes escenarios:
+
+**Escenario 1: Usuario gana un regalo**
+
+1. El usuario ingresa a Probar mi suerte.
+2. Presiona GIRAR.
+3. El servidor valida su participación.
+4. Se determina un regalo disponible.
+5. La ruleta muestra la animación.
+6. Aparece la tarjeta de felicitación.
+7. El regalo se descuenta del inventario promocional.
+8. Se registra el ganador.
+9. El premio aparece en Mis premios.
+10. El administrador puede actualizarlo a Entregado.
+
+**Escenario 2: Usuario obtiene Tienes un intento más**
+
+1. El usuario gira.
+2. Obtiene el comodín.
+3. Se habilita un intento adicional.
+4. Presiona VOLVER A GIRAR.
+5. El servidor selecciona exclusivamente entre los dos comodines.
+6. Se presenta el resultado.
+7. No se asigna ningún regalo.
+
+**Escenario 3: Usuario obtiene Gracias por participar**
+
+1. Se muestra el mensaje.
+2. Se presenta el acceso al Kit Personal.
+3. Se informa que podrá participar nuevamente en una hora.
+4. Se activa el periodo de espera.
+5. Se regresa al dashboard.
+
+**Escenario 4: Modo imposible activado**
+
+1. El administrador activa el modo imposible.
+2. El servidor actualiza la configuración.
+3. Los productos permanecen visibles en la ruleta.
+4. El usuario puede girar si cumple las condiciones de participación.
+5. El resultado será exclusivamente uno de los comodines.
+6. El inventario promocional permanece intacto.
+
+**Escenario 5: Administrador entrega un regalo**
+
+1. El administrador consulta Usuarios ganadores.
+2. Localiza el premio.
+3. Presiona Marcar como entregado.
+4. Confirma la operación.
+5. El servidor registra el cambio.
+6. El usuario visualiza automáticamente el nuevo estado.
+
+---
+
+# 14. PRUEBAS Y CRITERIOS DE ACEPTACIÓN
+
+Antes de considerar finalizada la implementación, ejecutar pruebas funcionales y de integración.
+
+Verificar:
+
+1. La nueva sección aparece en la ubicación indicada.
+2. Todas las secciones originales continúan funcionando.
+3. Los productos existentes pueden seleccionarse como regalos.
+4. Se pueden registrar regalos nuevos con imágenes.
+5. Las probabilidades se validan correctamente.
+6. La ruleta muestra los productos y comodines configurados.
+7. La animación coincide con el resultado del servidor.
+8. El modo imposible impide realmente ganar regalos.
+9. El comodín adicional no puede generar premios.
+10. No se permiten participaciones duplicadas.
+11. El inventario promocional nunca es negativo.
+12. No se asignan premios sin disponibilidad.
+13. Los premios ganados se registran permanentemente.
+14. Los usuarios solo pueden consultar sus propios premios.
+15. El administrador puede actualizar los estados.
+16. Los cambios se sincronizan automáticamente.
+17. El periodo de espera de una hora funciona correctamente.
+18. La cuenta regresiva persiste después de cerrar sesión.
+19. La interfaz funciona correctamente en dispositivos móviles.
+20. No existen botones sin funcionalidad.
+21. No existen errores críticos en consola.
+22. No se rompe ninguna funcionalidad preexistente.
+
+Realizar pruebas de concurrencia para garantizar la integridad del inventario y las participaciones.
+
+---
+
+# 15. ENTREGA FINAL
+
+Implementar la funcionalidad completa, no limitarse a generar una propuesta visual.
+
+Al finalizar:
+
+- Presentar un resumen de los archivos creados y modificados.
+- Identificar las tablas, colecciones o estructuras nuevas.
+- Documentar los cambios en la base de datos.
+- Indicar las políticas de seguridad implementadas.
+- Identificar los servicios o funciones backend creados.
+- Confirmar las pruebas ejecutadas.
+- Reportar cualquier funcionalidad que no haya podido completarse.
+- Documentar las variables de entorno nuevas, si fueran necesarias.
+- Verificar que la aplicación compile y funcione correctamente.
+
+**CONDICIÓN FINAL:**
+
+El resultado debe ser un módulo completamente funcional, integrado con Newbank Store, seguro, escalable, persistente y visualmente atractivo.
+
+No sacrificar funcionalidades existentes para incorporar las nuevas.
+
+La prioridad es mantener la estabilidad de la plataforma y ofrecer una experiencia de usuario de alta calidad, con una ruleta interactiva, administración completa de regalos y seguimiento confiable de los premios.

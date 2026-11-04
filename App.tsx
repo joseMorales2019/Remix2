@@ -25,6 +25,7 @@ import UserOrders from './pages/UserOrders';
 import ITTools from './pages/ITTools';
 import ADomicilio from './pages/ADomicilio';
 import DonacionesAncianos from './pages/DonacionesAncianos';
+import ProbarSuerte from './pages/ProbarSuerte';
 
 
 const CommunityScoreIndicator: React.FC = () => {
@@ -128,11 +129,25 @@ const SmartSlideMenu: React.FC<{ user: any; onSignOut: () => void }> = ({ user, 
     }
   }, [isOpen]);
 
+  const [unclaimedPrizesCount, setUnclaimedPrizesCount] = useState(0);
+
+  useEffect(() => {
+    if (user?.id) {
+      fetch(`/api/roulette/user-status/${user.id}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(d => {
+          if (d?.unclaimed_prizes_count) setUnclaimedPrizesCount(d.unclaimed_prizes_count);
+        })
+        .catch(() => {});
+    }
+  }, [user?.id, location.pathname]);
+
   // Definición de enlaces con lógica de roles basada en el prompt
   const navLinks = [
     { to: "/", label: "Tienda en linea", icon: "📊", category: 'Navegación', roles: ['admin', 'especialista', 'estudiante', 'invitado', 'inversionista', 'MYPE', 'aliado', 'jugador', 'ayudame', 'creditos'] },
     { to: "/domicilio", label: "Realizar Pedidos", icon: "🛵", category: 'Navegación', roles: ['admin', 'especialista', 'estudiante', 'invitado', 'inversionista', 'MYPE', 'aliado', 'jugador', 'ayudame', 'creditos'] },
     { to: "/donaciones", label: "Donar a Ancianos", icon: "❤️", category: 'Navegación', roles: ['admin', 'especialista', 'estudiante', 'invitado', 'inversionista', 'MYPE', 'aliado', 'jugador', 'ayudame', 'creditos'] },
+    { to: "/probar-suerte", label: "Probar mi suerte", icon: "🎡", category: 'Navegación', roles: ['admin', 'especialista', 'estudiante', 'invitado', 'inversionista', 'MYPE', 'aliado', 'jugador', 'ayudame', 'creditos'] },
     { to: "/gallery", label: "Galería", icon: "🖼️", category: 'Comunidad', roles: ['admin', 'especialista', 'estudiante', 'inversionista', 'MYPE'] },
 
     { to: "/feedback-requests", label: "Feedback", icon: "📝", category: 'Comunidad', roles: ['admin', 'especialista'] },
@@ -153,15 +168,16 @@ const SmartSlideMenu: React.FC<{ user: any; onSignOut: () => void }> = ({ user, 
     { to: "/admin", label: "Gestión", icon: "⚙️", category: 'Gestión', roles: ['admin', 'aliado'] }
   ].filter(link => {
     if (link.to === "/games") return false;
-    if (!user) return link.to === "/" || link.to === "/dashboard" || link.to === "/profile" || link.to === "/donaciones";
+    if (!user) return link.to === "/" || link.to === "/dashboard" || link.to === "/profile" || link.to === "/donaciones" || link.to === "/probar-suerte";
     // Si es administrador, tiene acceso a todas las rutas relevantes
     if (user.is_admin) return true;
     const type = user.profile_type;
-    // Always show Home, Dashboard, Profile and Donaciones for everyone.
+    // Always show Home, Dashboard, Profile, Donaciones and Probar mi suerte for everyone.
     if (link.to === "/") return true;
     if (link.to === "/dashboard") return true;
     if (link.to === "/profile") return true;
     if (link.to === "/donaciones") return true;
+    if (link.to === "/probar-suerte") return true;
     if (link.to === "/games" && type === 'aliado') return false;
     if (link.to === "/games") return true;
     return link.roles.includes(type);
@@ -202,13 +218,16 @@ const SmartSlideMenu: React.FC<{ user: any; onSignOut: () => void }> = ({ user, 
               <Link 
                 key={`nav-link-${link.to}-${idx}`} 
                 to={link.to}
-                className={`px-3 py-2 rounded-xl text-xs lg:text-sm font-bold transition-all ${
+                className={`px-3 py-2 rounded-xl text-xs lg:text-sm font-bold transition-all flex items-center gap-1.5 ${
                   location.pathname === link.to 
                   ? 'text-blue-600 bg-blue-50' 
                   : 'text-slate-600 hover:text-blue-600 hover:bg-slate-50'
                 }`}
               >
-                {link.label}
+                <span>{link.label}</span>
+                {link.to === '/probar-suerte' && unclaimedPrizesCount > 0 && (
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" title={`${unclaimedPrizesCount} premio(s) por reclamar`} />
+                )}
               </Link>
             ))}
             
@@ -342,14 +361,21 @@ const SmartSlideMenu: React.FC<{ user: any; onSignOut: () => void }> = ({ user, 
                   <Link 
                     key={`menu-${category}-${link.to}-${idx}`} 
                     to={link.to}
-                    className={`flex items-center space-x-4 p-4 rounded-2xl transition-all font-bold text-sm ${
+                    className={`flex items-center justify-between p-4 rounded-2xl transition-all font-bold text-sm ${
                       location.pathname === link.to 
                       ? 'bg-blue-50 text-blue-600 shadow-sm shadow-blue-100' 
                       : 'text-slate-600 hover:bg-slate-50'
                     }`}
                   >
-                    <span className="text-xl">{link.icon}</span>
-                    <span>{link.label}</span>
+                    <div className="flex items-center space-x-4">
+                      <span className="text-xl">{link.icon}</span>
+                      <span>{link.label}</span>
+                    </div>
+                    {link.to === '/probar-suerte' && unclaimedPrizesCount > 0 && (
+                      <span className="px-2 py-0.5 rounded-full bg-amber-500 text-slate-900 text-[10px] font-black animate-pulse">
+                        {unclaimedPrizesCount}
+                      </span>
+                    )}
                   </Link>
                 ))}
               </div>
@@ -781,6 +807,7 @@ const App: React.FC = () => {
             <Route path="/mis-pedidos" element={userProfile ? <UserOrders user={userProfile} /> : <Navigate to="/register" />} />
             <Route path="/donaciones" element={<DonacionesAncianos user={userProfile} />} />
             <Route path="/donar" element={<DonacionesAncianos user={userProfile} />} />
+            <Route path="/probar-suerte" element={userProfile ? <ProbarSuerte user={userProfile} /> : <Navigate to="/register" />} />
             <Route path="/terms" element={<Terms />} />
           </Routes>
         </main>

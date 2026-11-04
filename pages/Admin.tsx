@@ -5,9 +5,10 @@ import AliadoOrders from './AliadoOrders';
 import { AdminAvatarPanel, AvataresAdminPanel } from '../components/AvatarSystem';
 import { SystemRealtimeMetrics } from '../components/SystemRealtimeMetrics';
 import { WebAnalyticsRealtime } from '../components/WebAnalyticsRealtime';
+import { AdminGiftsPanel } from '../components/AdminGiftsPanel';
 
 const Admin: React.FC<{ user: any }> = ({ user }) => {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'realtime_metrics' | 'web_analytics' | 'users' | 'disputes' | 'approvals' | 'active_loans' | 'verify_payments' | 'saving_vouchers' | 'active_savings' | 'return_vouchers' | 'validacion_pagos' | 'all_loans' | 'control_total' | 'control_global_pagos' | 'projects' | 'payment_requests' | 'store_admin' | 'orders_admin' | 'avatares'>(user?.profile_type === 'aliado' ? 'store_admin' : 'dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'realtime_metrics' | 'web_analytics' | 'users' | 'disputes' | 'approvals' | 'active_loans' | 'verify_payments' | 'saving_vouchers' | 'active_savings' | 'return_vouchers' | 'validacion_pagos' | 'all_loans' | 'control_total' | 'control_global_pagos' | 'projects' | 'payment_requests' | 'store_admin' | 'gifts_admin' | 'orders_admin' | 'avatares'>(user?.profile_type === 'aliado' ? 'store_admin' : 'dashboard');
   const [stats, setStats] = useState({
     total_loans: 0,
     active_loans: 0,
@@ -856,6 +857,7 @@ const Admin: React.FC<{ user: any }> = ({ user }) => {
             { id: 'control_global_pagos', label: 'Control Global', icon: '🌍', roles: ['admin'] },
             { id: 'projects', label: 'Proyectos', icon: '🚀', roles: ['admin'] },
             { id: 'store_admin', label: 'Tienda', icon: '🛒', roles: ['admin', 'aliado'] },
+            { id: 'gifts_admin', label: 'Regalos', icon: '🎁', roles: ['admin'] },
             { id: 'orders_admin', label: 'Pedidos', icon: '📦', roles: ['admin', 'aliado'] },
             { id: 'users', label: 'Usuarios', icon: '👥', roles: ['admin'] },
             { id: 'avatares', label: 'Avatares', icon: '🤖', roles: ['admin'] }
@@ -1948,6 +1950,10 @@ const Admin: React.FC<{ user: any }> = ({ user }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {activeTab === 'gifts_admin' && (
+        <AdminGiftsPanel user={user} products={products} />
       )}
 
       {activeTab === 'orders_admin' && (
