@@ -233,12 +233,13 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
 
     setActionLoading('saving-catalog-gift');
     try {
+      const imgUrl = (selectedCatalogProduct.image_urls?.[0] || selectedCatalogProduct.image_url || '').trim();
       const newGiftPayload = {
         id: 'gift_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-        product_id: selectedCatalogProduct.id,
+        product_id: selectedCatalogProduct.id || null,
         name: catalogGiftForm.name || selectedCatalogProduct.name,
         description: selectedCatalogProduct.description || '',
-        image_url: selectedCatalogProduct.image_urls?.[0] || 'https://picsum.photos/seed/gift/400/400',
+        image_url: imgUrl !== '' ? imgUrl : 'https://picsum.photos/seed/gift/400/400',
         gift_type: 'product' as const,
         initial_quantity: Number(catalogGiftForm.quantity),
         available_quantity: Number(catalogGiftForm.quantity),
@@ -323,11 +324,13 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
 
     setActionLoading('saving-custom-gift');
     try {
+      const customImgUrl = (customGiftForm.image_url || '').trim();
       const newCustomGift = {
         id: 'gift_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+        product_id: null,
         name: customGiftForm.name,
         description: customGiftForm.description,
-        image_url: customGiftForm.image_url || 'https://picsum.photos/seed/gift/400/400',
+        image_url: customImgUrl !== '' ? customImgUrl : 'https://picsum.photos/seed/gift/400/400',
         gift_type: 'custom' as const,
         initial_quantity: Number(customGiftForm.quantity),
         available_quantity: Number(customGiftForm.quantity),
@@ -372,16 +375,21 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
   const handleUpdateGift = async (gift: RouletteGift) => {
     setActionLoading('updating-gift-' + gift.id);
     try {
+      const sanitizedGift = {
+        ...gift,
+        product_id: (gift.product_id && gift.product_id.trim() !== '') ? gift.product_id : null,
+        image_url: (gift.image_url || '').trim() || 'https://picsum.photos/seed/gift/400/400'
+      };
       try {
         await supabase.from('gifts').upsert({
-          ...gift,
+          ...sanitizedGift,
           updated_at: new Date().toISOString()
         });
       } catch (dbErr) {
         console.warn('Direct Supabase gift update error:', dbErr);
       }
 
-      await rouletteService.saveGift(gift, user);
+      await rouletteService.saveGift(sanitizedGift, user);
       setEditingGift(null);
       await fetchData();
     } catch (err: any) {
