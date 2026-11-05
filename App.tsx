@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { HashRouter, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { supabase } from './supabase';
+import { rouletteService } from './services/rouletteService';
 import Dashboard from './pages/Dashboard';
 import PublicDefaulters from './pages/PublicDefaulters';
 import LoanApplication from './pages/LoanApplication';
@@ -133,10 +134,9 @@ const SmartSlideMenu: React.FC<{ user: any; onSignOut: () => void }> = ({ user, 
 
   useEffect(() => {
     if (user?.id) {
-      fetch(`/api/roulette/user-status/${user.id}`)
-        .then(r => r.ok ? r.json() : null)
+      rouletteService.getUserStatus(user.id)
         .then(d => {
-          if (d?.unclaimed_prizes_count) setUnclaimedPrizesCount(d.unclaimed_prizes_count);
+          if (d?.unclaimed_prizes_count !== undefined) setUnclaimedPrizesCount(d.unclaimed_prizes_count);
         })
         .catch(() => {});
     }
@@ -560,7 +560,15 @@ const NotificationHandler: React.FC<{ user: any }> = ({ user }) => {
   useEffect(() => {
     if (!user) return;
 
-    const socket = io();
+    const socket = io({
+      autoConnect: true,
+      reconnectionAttempts: 2,
+      timeout: 3000
+    });
+
+    socket.on('connect_error', () => {
+      socket.disconnect();
+    });
 
     socket.on('connect', () => {
       socket.emit('identify', user.id);

@@ -67,21 +67,23 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
 
       // Direct live fetch from Supabase table 'gifts' to guarantee real-time database display
       let dbGiftsList: RouletteGift[] = [];
+      let fetchedDirectly = false;
       try {
         const { data: dbGifts, error: dbErr } = await supabase
           .from('gifts')
           .select('*')
           .order('created_at', { ascending: false });
-        if (!dbErr && dbGifts && dbGifts.length > 0) {
+        if (!dbErr && dbGifts) {
           dbGiftsList = dbGifts;
+          fetchedDirectly = true;
         }
       } catch (err) {
         console.warn('Direct Supabase gifts fetch failed, falling back to API:', err);
       }
 
       setSettings(s);
-      // Prefer direct live database rows from Supabase
-      setGifts(dbGiftsList.length > 0 ? dbGiftsList : g);
+      // Prefer direct live database rows from Supabase when available
+      setGifts(fetchedDirectly && dbGiftsList.length > 0 ? dbGiftsList : (g.length > 0 ? g : dbGiftsList));
       setOptions(o);
       setWinners(w);
       setAuditLogs(a);
