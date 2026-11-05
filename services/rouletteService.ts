@@ -26,6 +26,31 @@ export interface RouletteSettings {
   participation_cooldown_minutes: number;
   configuration_version: number;
   updated_at: string;
+  geo_restriction_enabled?: boolean;
+  geo_latitude?: number | null;
+  geo_longitude?: number | null;
+  geo_radius_km?: number | null;
+  geo_zone_name?: string | null;
+}
+
+export function calculateDistanceKm(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
+  if (!lat1 || !lon1 || !lat2 || !lon2) return 0;
+  const R = 6371; // Earth radius in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c * 10) / 10;
 }
 
 export interface RouletteOption {
@@ -107,7 +132,12 @@ const DEFAULT_SETTINGS: RouletteSettings = {
   personal_kit_product_id: 'eef3db8b-a23d-4bd2-831a-e72491cbae6b',
   participation_cooldown_minutes: 60,
   configuration_version: 1,
-  updated_at: new Date().toISOString()
+  updated_at: new Date().toISOString(),
+  geo_restriction_enabled: false,
+  geo_latitude: 13.6929,
+  geo_longitude: -89.2182,
+  geo_radius_km: 25,
+  geo_zone_name: 'San Salvador y Área Metropolitana'
 };
 
 const DEFAULT_OPTIONS: RouletteOption[] = [

@@ -21,6 +21,11 @@ interface StoreData {
     personal_kit_product_id: string;
     participation_cooldown_minutes: number;
     configuration_version: number;
+    geo_restriction_enabled?: boolean;
+    geo_latitude?: number | null;
+    geo_longitude?: number | null;
+    geo_radius_km?: number | null;
+    geo_zone_name?: string | null;
     updated_at: string;
   };
   options: Array<{
@@ -102,6 +107,11 @@ const DEFAULT_STORE: StoreData = {
     personal_kit_product_id: 'eef3db8b-a23d-4bd2-831a-e72491cbae6b',
     participation_cooldown_minutes: 60,
     configuration_version: 1,
+    geo_restriction_enabled: false,
+    geo_latitude: 13.6929,
+    geo_longitude: -89.2182,
+    geo_radius_km: 25,
+    geo_zone_name: 'San Salvador y alrededores',
     updated_at: new Date().toISOString()
   },
   options: [

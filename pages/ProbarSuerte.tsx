@@ -10,7 +10,8 @@ import {
   RouletteOption,
   GiftWinner,
   UserRouletteStatus,
-  SpinResult
+  SpinResult,
+  calculateDistanceKm
 } from '../services/rouletteService';
 
 export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
@@ -54,6 +55,51 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
   const [secondsLeft, setSecondsLeft] = useState<number>(0);
   const timerIntervalRef = useRef<any>(null);
 
+  // Geographic restriction check state
+  const [geoCheckStatus, setGeoCheckStatus] = useState<'checking' | 'allowed' | 'restricted'>('allowed');
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [calculatedDistance, setCalculatedDistance] = useState<number | null>(null);
+
+  // Check if user is within the admin-defined coverage area
+  const checkUserGeolocation = (currentSettings: RouletteSettings) => {
+    if (!currentSettings.geo_restriction_enabled) {
+      setGeoCheckStatus('allowed');
+      return;
+    }
+
+    if (!navigator.geolocation) {
+      setGeoCheckStatus('restricted');
+      return;
+    }
+
+    setGeoCheckStatus('checking');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const userLat = pos.coords.latitude;
+        const userLng = pos.coords.longitude;
+        setUserLocation({ lat: userLat, lng: userLng });
+
+        const centerLat = typeof currentSettings.geo_latitude === 'number' && !isNaN(currentSettings.geo_latitude) ? currentSettings.geo_latitude : 13.6929;
+        const centerLng = typeof currentSettings.geo_longitude === 'number' && !isNaN(currentSettings.geo_longitude) ? currentSettings.geo_longitude : -89.2182;
+        const radius = typeof currentSettings.geo_radius_km === 'number' && !isNaN(currentSettings.geo_radius_km) ? currentSettings.geo_radius_km : 25;
+
+        const dist = calculateDistanceKm(userLat, userLng, centerLat, centerLng);
+        setCalculatedDistance(dist);
+
+        if (dist <= radius) {
+          setGeoCheckStatus('allowed');
+        } else {
+          setGeoCheckStatus('restricted');
+        }
+      },
+      (err) => {
+        console.warn('Geolocation permission denied or unavailable in ProbarSuerte:', err);
+        setGeoCheckStatus('restricted');
+      },
+      { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+    );
+  };
+
   // Fetch initial data
   const fetchData = async () => {
     try {
@@ -66,6 +112,9 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
       setSettings(fetchedSettings);
       setGifts(fetchedGifts);
       setOptions(fetchedOptions);
+
+      // Perform geo restriction validation
+      checkUserGeolocation(fetchedSettings);
 
       if (activeUserId) {
         const [status, prizes] = await Promise.all([
@@ -284,7 +333,60 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
 
             {/* TAB 1: RULETA INTERACTIVA */}
             {activeTab === 'wheel' && (
-              <div className="flex flex-col items-center">
+              <>
+                {/* Checking geolocation status */}
+                {settings?.geo_restriction_enabled && geoCheckStatus === 'checking' && (
+                  <div className="py-20 flex flex-col items-center justify-center gap-4 text-center">
+                    <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">
+                      Verificando disponibilidad de juegos para tu ubicación...
+                    </p>
+                  </div>
+                )}
+
+                {/* Restricted location: Display the exact required message */}
+                {settings?.geo_restriction_enabled && geoCheckStatus === 'restricted' && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="w-full max-w-lg mx-auto bg-white rounded-3xl p-8 border border-slate-200/90 shadow-xl text-center space-y-6 my-4"
+                  >
+                    <div className="w-20 h-20 mx-auto rounded-3xl bg-amber-50 border-2 border-amber-200 flex items-center justify-center text-4xl shadow-sm">
+                      📍
+                    </div>
+
+                    <div className="space-y-2">
+                      <span className="text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full bg-slate-100 text-slate-600">
+                        Restricción Geográfica
+                      </span>
+                      <h3 className="text-xl sm:text-2xl font-black text-slate-900 leading-snug">
+                        por el momento no hay juegos disponibles para tu ubicacion.
+                      </h3>
+                      <p className="text-xs text-slate-500 font-medium max-w-md mx-auto">
+                        La Ruleta Rusa promocional solo está habilitada para usuarios dentro del área designada por la administración{settings?.geo_zone_name ? ` (${settings.geo_zone_name})` : ''}.
+                      </p>
+                    </div>
+
+                    <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
+                      <button
+                        onClick={() => settings && checkUserGeolocation(settings)}
+                        className="px-5 py-3 rounded-2xl bg-slate-900 text-white text-xs font-black uppercase tracking-wider hover:bg-black transition shadow cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <span>🔄</span> Reintentar con mi GPS
+                      </button>
+                      <button
+                        onClick={() => navigate('/')}
+                        className="px-5 py-3 rounded-2xl bg-slate-100 text-slate-700 text-xs font-black uppercase tracking-wider hover:bg-slate-200 transition cursor-pointer"
+                      >
+                        Ir al Inicio
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+
+                {/* Normal Roulette Wheel if unrestricted or location allowed */}
+                {(!settings?.geo_restriction_enabled || geoCheckStatus === 'allowed') && (
+                  <div className="flex flex-col items-center">
                 {/* Status Bar */}
                 <div className="w-full max-w-md bg-white rounded-3xl p-4 mb-6 shadow-sm border border-slate-200/80 flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -355,6 +457,8 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
                 </div>
               </div>
             )}
+          </>
+        )}
 
             {/* TAB 2: MIS PREMIOS GANADOS */}
             {activeTab === 'my_prizes' && (

@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { supabase } from '../supabase';
 import {
   rouletteService,
@@ -6,7 +8,8 @@ import {
   RouletteGift,
   RouletteOption,
   GiftWinner,
-  AdministrativeAuditLog
+  AdministrativeAuditLog,
+  calculateDistanceKm
 } from '../services/rouletteService';
 
 interface AdminGiftsPanelProps {
@@ -15,7 +18,7 @@ interface AdminGiftsPanelProps {
 }
 
 export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products }) => {
-  const [subTab, setSubTab] = useState<'dashboard' | 'gifts' | 'wildcards' | 'winners' | 'audit'>('dashboard');
+  const [subTab, setSubTab] = useState<'dashboard' | 'gifts' | 'wildcards' | 'winners' | 'geo' | 'audit'>('dashboard');
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
@@ -53,6 +56,122 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
     probability: 5,
     is_active: true
   });
+
+  // State for Geographic Area & Map Restriction
+  const [geoForm, setGeoForm] = useState({
+    enabled: false,
+    latitude: 13.6929,
+    longitude: -89.2182,
+    radiusKm: 25,
+    zoneName: 'San Salvador y alrededores'
+  });
+
+  const geoMapContainerRef = useRef<HTMLDivElement | null>(null);
+  const geoMapInstanceRef = useRef<L.Map | null>(null);
+  const geoMarkerRef = useRef<L.Marker | null>(null);
+  const geoCircleRef = useRef<L.Circle | null>(null);
+
+  // Sync settings with geoForm when settings load
+  useEffect(() => {
+    if (settings) {
+      setGeoForm({
+        enabled: !!settings.geo_restriction_enabled,
+        latitude: typeof settings.geo_latitude === 'number' && !isNaN(settings.geo_latitude) ? settings.geo_latitude : 13.6929,
+        longitude: typeof settings.geo_longitude === 'number' && !isNaN(settings.geo_longitude) ? settings.geo_longitude : -89.2182,
+        radiusKm: typeof settings.geo_radius_km === 'number' && !isNaN(settings.geo_radius_km) ? settings.geo_radius_km : 25,
+        zoneName: settings.geo_zone_name || 'San Salvador y alrededores'
+      });
+    }
+  }, [settings]);
+
+  // Leaflet map initialization and updates when in 'geo' tab
+  useEffect(() => {
+    if (subTab !== 'geo') {
+      if (geoMapInstanceRef.current) {
+        geoMapInstanceRef.current.remove();
+        geoMapInstanceRef.current = null;
+        geoMarkerRef.current = null;
+        geoCircleRef.current = null;
+      }
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      if (!geoMapContainerRef.current) return;
+
+      const lat = !isNaN(geoForm.latitude) ? geoForm.latitude : 13.6929;
+      const lng = !isNaN(geoForm.longitude) ? geoForm.longitude : -89.2182;
+      const radiusMeters = (geoForm.radiusKm || 25) * 1000;
+
+      if (!geoMapInstanceRef.current) {
+        const map = L.map(geoMapContainerRef.current, {
+          center: [lat, lng],
+          zoom: 11,
+          zoomControl: false
+        });
+
+        L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+          attribution: '&copy; Google Maps',
+          maxZoom: 20
+        }).addTo(map);
+
+        L.control.zoom({ position: 'topright' }).addTo(map);
+
+        const customMarkerIcon = L.divIcon({
+          className: 'roulette-geo-pin',
+          html: `<div style="background-color:#2563eb; width:38px; height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 16px rgba(0,0,0,0.4); border:3px solid white; cursor:move;"><span style="font-size:20px;">🎯</span></div>`,
+          iconSize: [38, 38],
+          iconAnchor: [19, 19]
+        });
+
+        const marker = L.marker([lat, lng], {
+          icon: customMarkerIcon,
+          draggable: true
+        }).addTo(map);
+
+        marker.on('dragend', (e: any) => {
+          const pos = e.target.getLatLng();
+          setGeoForm((prev) => ({
+            ...prev,
+            latitude: Math.round(pos.lat * 10000) / 10000,
+            longitude: Math.round(pos.lng * 10000) / 10000
+          }));
+        });
+
+        const circle = L.circle([lat, lng], {
+          radius: radiusMeters,
+          color: '#2563eb',
+          weight: 2,
+          fillColor: '#3b82f6',
+          fillOpacity: 0.22
+        }).addTo(map);
+
+        map.on('click', (e: L.LeafletMouseEvent) => {
+          const newLat = Math.round(e.latlng.lat * 10000) / 10000;
+          const newLng = Math.round(e.latlng.lng * 10000) / 10000;
+          marker.setLatLng([newLat, newLng]);
+          circle.setLatLng([newLat, newLng]);
+          setGeoForm((prev) => ({
+            ...prev,
+            latitude: newLat,
+            longitude: newLng
+          }));
+        });
+
+        geoMapInstanceRef.current = map;
+        geoMarkerRef.current = marker;
+        geoCircleRef.current = circle;
+      } else {
+        geoMapInstanceRef.current.setView([lat, lng]);
+        geoMarkerRef.current?.setLatLng([lat, lng]);
+        geoCircleRef.current?.setLatLng([lat, lng]);
+        geoCircleRef.current?.setRadius(radiusMeters);
+        geoMapInstanceRef.current.invalidateSize();
+      }
+    }, 120);
+
+    return () => clearTimeout(timer);
+  }, [subTab, geoForm.latitude, geoForm.longitude, geoForm.radiusKm]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -233,6 +352,70 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
     } finally {
       setActionLoading(null);
     }
+  };
+
+  // Save Geographic coverage & restriction settings
+  const handleSaveGeoSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!settings) return;
+    setActionLoading('saving-geo-settings');
+    try {
+      const payload: Partial<RouletteSettings> = {
+        ...settings,
+        geo_restriction_enabled: geoForm.enabled,
+        geo_latitude: Number(geoForm.latitude),
+        geo_longitude: Number(geoForm.longitude),
+        geo_radius_km: Number(geoForm.radiusKm),
+        geo_zone_name: geoForm.zoneName.trim()
+      };
+
+      const updated = await rouletteService.updateSettings(payload, user);
+      setSettings(updated);
+      alert('¡Configuración de área geográfica de la Ruleta actualizada con éxito!');
+      await fetchData();
+    } catch (err: any) {
+      alert('Error guardando configuración geográfica: ' + err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Fast preset zones
+  const handleSelectGeoPreset = (name: string, lat: number, lng: number, radiusKm: number) => {
+    setGeoForm((prev) => ({
+      ...prev,
+      zoneName: name,
+      latitude: lat,
+      longitude: lng,
+      radiusKm
+    }));
+  };
+
+  // GPS current location for admin
+  const handleGetAdminCurrentLocation = () => {
+    if (!navigator.geolocation) {
+      alert('La geolocalización no está soportada en tu navegador.');
+      return;
+    }
+    setActionLoading('getting-gps');
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setActionLoading(null);
+        const lat = Math.round(pos.coords.latitude * 10000) / 10000;
+        const lng = Math.round(pos.coords.longitude * 10000) / 10000;
+        setGeoForm((prev) => ({
+          ...prev,
+          latitude: lat,
+          longitude: lng,
+          zoneName: prev.zoneName || 'Ubicación actual del Administrador'
+        }));
+      },
+      (err) => {
+        setActionLoading(null);
+        alert('No se pudo obtener tu ubicación actual: ' + err.message);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   };
 
   // Select catalog product
@@ -512,6 +695,7 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
             { id: 'gifts', label: 'Regalos & Stock', icon: '🎁' },
             { id: 'wildcards', label: 'Comodines & Probabilidades', icon: '🎲' },
             { id: 'winners', label: 'Usuarios Ganadores', icon: '🏆', badge: winners.filter(w => w.status === 'PENDING').length },
+            { id: 'geo', label: 'Área Geográfica & Mapa', icon: '📍' },
             { id: 'audit', label: 'Auditoría', icon: '📜' }
           ].map((tab) => (
             <button
@@ -1086,7 +1270,194 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
             </div>
           )}
 
-          {/* SUBTAB 5: AUDITORÍA ADMINISTRATIVA */}
+          {/* SUBTAB 5: ÁREA GEOGRÁFICA & MAPA */}
+          {subTab === 'geo' && (
+            <div className="space-y-6">
+              {/* Header Card */}
+              <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 sm:p-8 space-y-6">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-100 pb-6">
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                      Geolocalización & Cobertura
+                    </span>
+                    <h4 className="text-xl font-black uppercase text-slate-900 mt-2 flex items-center gap-2">
+                      <span>📍</span> Área Geográfica de la Ruleta Rusa
+                    </h4>
+                    <p className="text-xs text-slate-500 font-medium mt-1 max-w-2xl">
+                      Selecciona en el mapa el área geográfica donde se le mostrará el juego de la ruleta a los usuarios según su ubicación. Si un usuario accede desde fuera del radio permitido, se le indicará: <span className="font-bold text-slate-700">«por el momento no hay juegos disponibles para tu ubicacion.»</span>
+                    </p>
+                  </div>
+
+                  {/* Toggle Switch */}
+                  <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 px-5 py-3.5 rounded-2xl">
+                    <div className="text-right">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">
+                        Estado del Filtro
+                      </span>
+                      <span className={`text-xs font-black uppercase ${geoForm.enabled ? 'text-green-600' : 'text-slate-500'}`}>
+                        {geoForm.enabled ? 'ACTIVO (Restringido)' : 'INACTIVO (Global)'}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setGeoForm(prev => ({ ...prev, enabled: !prev.enabled }))}
+                      className={`relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                        geoForm.enabled ? 'bg-green-600' : 'bg-slate-300'
+                      }`}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                          geoForm.enabled ? 'translate-x-7' : 'translate-x-0'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Quick Presets */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">
+                      ⚡ Seleccionar Zona Rápida o GPS:
+                    </span>
+                    <button
+                      type="button"
+                      disabled={actionLoading === 'getting-gps'}
+                      onClick={handleGetAdminCurrentLocation}
+                      className="px-3 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <span>🛰️</span> {actionLoading === 'getting-gps' ? 'Detectando...' : 'Usar mi ubicación GPS actual'}
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { name: 'San Salvador (Área Metropolitana)', lat: 13.6929, lng: -89.2182, r: 25 },
+                      { name: 'Santa Tecla / La Libertad', lat: 13.6769, lng: -89.2797, r: 20 },
+                      { name: 'Santa Ana (Occidente)', lat: 13.9942, lng: -89.5597, r: 25 },
+                      { name: 'San Miguel (Oriente)', lat: 13.4833, lng: -88.1833, r: 25 },
+                      { name: 'Sonsonate', lat: 13.7189, lng: -89.7242, r: 20 },
+                      { name: 'Todo El Salvador (Nacional)', lat: 13.7942, lng: -88.8965, r: 90 }
+                    ].map((preset) => (
+                      <button
+                        key={preset.name}
+                        type="button"
+                        onClick={() => handleSelectGeoPreset(preset.name, preset.lat, preset.lng, preset.r)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold transition border cursor-pointer ${
+                          Math.abs(geoForm.latitude - preset.lat) < 0.01 && Math.abs(geoForm.longitude - preset.lng) < 0.01
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                            : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200/80'
+                        }`}
+                      >
+                        {preset.name} ({preset.r} km)
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Leaflet Map Interactive Display */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
+                    <span>💡 Haz clic en el mapa o arrastra el marcador 🎯 para reubicar el centro de cobertura.</span>
+                    <span className="font-mono text-slate-400">Lat: {geoForm.latitude.toFixed(4)}, Lng: {geoForm.longitude.toFixed(4)}</span>
+                  </div>
+                  <div
+                    ref={geoMapContainerRef}
+                    className="w-full h-96 rounded-3xl border-2 border-slate-200 overflow-hidden shadow-inner relative z-0"
+                    style={{ minHeight: '380px' }}
+                  />
+                </div>
+
+                {/* Controls & Inputs */}
+                <form onSubmit={handleSaveGeoSettings} className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
+                  {/* Zone Name */}
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-black uppercase text-slate-600 tracking-wider">
+                      Nombre de la Zona
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={geoForm.zoneName}
+                      onChange={(e) => setGeoForm({ ...geoForm, zoneName: e.target.value })}
+                      placeholder="Ej: San Salvador y alrededores"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  {/* Radius Slider & input */}
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <label className="text-[11px] font-black uppercase text-slate-600 tracking-wider">
+                        Radio de Cobertura
+                      </label>
+                      <span className="text-xs font-black text-blue-600 font-mono">
+                        {geoForm.radiusKm} km
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="range"
+                        min="1"
+                        max="150"
+                        step="1"
+                        value={geoForm.radiusKm}
+                        onChange={(e) => setGeoForm({ ...geoForm, radiusKm: Number(e.target.value) })}
+                        className="w-full accent-blue-600 cursor-pointer"
+                      />
+                      <input
+                        type="number"
+                        min="1"
+                        max="300"
+                        value={geoForm.radiusKm}
+                        onChange={(e) => setGeoForm({ ...geoForm, radiusKm: Math.max(1, Number(e.target.value)) })}
+                        className="w-20 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-center text-slate-800"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Action Save Button */}
+                  <div className="flex flex-col justify-end space-y-1.5">
+                    <button
+                      type="submit"
+                      disabled={actionLoading === 'saving-geo-settings'}
+                      className="w-full py-3.5 bg-blue-600 text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-blue-700 transition shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      {actionLoading === 'saving-geo-settings' ? (
+                        <>
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          <span>Guardando...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>💾</span> Guardar Área de Cobertura
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+
+                {/* Explanation Banner */}
+                <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 text-xs text-slate-600 space-y-1">
+                  <div className="flex items-center gap-2 font-bold text-slate-800">
+                    <span>🛡️</span> Reglas de Cobertura Geográfica:
+                  </div>
+                  <ul className="list-disc pl-5 space-y-0.5 text-[11px] text-slate-500">
+                    <li>
+                      <strong>Si la restricción está ACTIVA:</strong> Se verificará la ubicación del navegador del usuario al acceder a «Probar mi suerte». Si está dentro del círculo azul ({geoForm.radiusKm} km desde el centro), la ruleta se abrirá con normalidad.
+                    </li>
+                    <li>
+                      <strong>Si está fuera del área:</strong> Se le mostrará amigablemente el mensaje: <em>«por el momento no hay juegos disponibles para tu ubicacion.»</em>
+                    </li>
+                    <li>
+                      <strong>Si la restricción está INACTIVA:</strong> Todos los usuarios podrán participar sin importar su ubicación geográfica.
+                    </li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* SUBTAB 6: AUDITORÍA ADMINISTRATIVA */}
           {subTab === 'audit' && (
             <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 space-y-4">
               <h4 className="font-black uppercase text-slate-900 text-base">
