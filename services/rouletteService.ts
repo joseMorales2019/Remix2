@@ -521,7 +521,7 @@ export const rouletteService = {
       }
     }
 
-    // Direct client-side spin execution with Supabase sync
+    // Direct client-side spin execution with Supabase sync & Strict Inventory Supervision
     const settings = await this.getSettings();
     if (!settings.is_active) {
       throw new Error('La ruleta se encuentra actualmente desactivada por el administrador.');
@@ -536,7 +536,8 @@ export const rouletteService = {
     const gifts = await this.getGifts(false);
     const options = await this.getOptions();
 
-    const visualGifts = gifts.filter(g => g.is_active);
+    // SUPERVISION FILTER 1: Strictly exclude inactive gifts or out-of-stock gifts upfront
+    const visualGifts = gifts.filter(g => g.is_active && (g.available_quantity > 0));
     const visualOptions = options.filter(o => o.is_active);
 
     const wheelSlices: Array<{
@@ -598,7 +599,29 @@ export const rouletteService = {
       }
     }
 
-    const sliceIndex = wheelSlices.findIndex(s => s.id === selectedSlice.id);
+    // SUPERVISION FILTER 2: Real-time Database Stock Interception
+    // Before awarding a gift, query live inventory from Supabase database to prevent race conditions & over-granting
+    if (selectedSlice.type === 'gift') {
+      try {
+        const { data: liveGift, error: fetchErr } = await supabase
+          .from('gifts')
+          .select('id, name, image_url, available_quantity, won_quantity, is_active')
+          .eq('id', selectedSlice.id)
+          .maybeSingle();
+
+        if (fetchErr || !liveGift || !liveGift.is_active || Number(liveGift.available_quantity) <= 0) {
+          console.warn(`[SUPERVISIÓN RULETA] El regalo "${selectedSlice.name}" agotó existencias en tiempo real. Redirigiendo a no_prize.`);
+          const fallbackNoPrize = wheelSlices.find(s => s.type === 'no_prize') || wheelSlices[0];
+          selectedSlice = fallbackNoPrize;
+        }
+      } catch (supervisionErr) {
+        console.warn('Error en mecanismo de supervisión de stock:', supervisionErr);
+      }
+    }
+
+    let sliceIndex = wheelSlices.findIndex(s => s.id === selectedSlice.id);
+    if (sliceIndex < 0) sliceIndex = 0;
+
     let winnerRecord: GiftWinner | undefined;
     let extraAttemptGranted = false;
     const cooldownMinutes = settings.participation_cooldown_minutes || 60;
@@ -609,48 +632,66 @@ export const rouletteService = {
       if (!giftObj || giftObj.available_quantity <= 0) {
         const fallbackNoPrize = wheelSlices.find(s => s.type === 'no_prize') || wheelSlices[0];
         selectedSlice = fallbackNoPrize;
+        sliceIndex = wheelSlices.findIndex(s => s.id === selectedSlice.id);
       } else {
-        const newAvail = giftObj.available_quantity - 1;
+        // SUPERVISION STEP 3: Atomic stock update with available_quantity > 0 condition
+        const newAvail = Math.max(0, giftObj.available_quantity - 1);
         const newWon = (giftObj.won_quantity || 0) + 1;
 
-        // Update gift stock in Supabase
-        await supabase.from('gifts').update({
-          available_quantity: newAvail,
-          won_quantity: newWon,
-          updated_at: new Date().toISOString()
-        }).eq('id', giftObj.id);
+        const { data: updatedDbGift, error: updateStockErr } = await supabase
+          .from('gifts')
+          .update({
+            available_quantity: newAvail,
+            won_quantity: newWon,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', giftObj.id)
+          .gt('available_quantity', 0)
+          .select()
+          .maybeSingle();
 
-        const randHex = Math.random().toString(36).substring(2, 8).toUpperCase();
-        const uniqueCode = `NBK-GIFT-${randHex}-${Date.now().toString(36).toUpperCase()}`;
-        const winnerId = `winner_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+        if (updateStockErr || !updatedDbGift) {
+          console.warn(`[SUPERVISIÓN RULETA CONCURRENTE] Falló actualización atómica por stock agotado para ${giftObj.name}. Redirigiendo tirada.`);
+          const fallbackNoPrize = wheelSlices.find(s => s.type === 'no_prize') || wheelSlices[0];
+          selectedSlice = fallbackNoPrize;
+          sliceIndex = wheelSlices.findIndex(s => s.id === selectedSlice.id);
+        } else {
+          // Stock successfully reserved! Proceed with winner creation
+          giftObj.available_quantity = newAvail;
+          giftObj.won_quantity = newWon;
 
-        winnerRecord = {
-          id: winnerId,
-          unique_code: uniqueCode,
-          user_id: userId,
-          user_name: userMetadata?.full_name || 'Usuario NewBank',
-          user_email: userMetadata?.email || '',
-          user_phone: userMetadata?.phone || '',
-          gift_id: giftObj.id,
-          gift_name_snapshot: giftObj.name,
-          gift_image_snapshot: giftObj.image_url,
-          status: 'PENDING',
-          won_at: new Date().toISOString(),
-          delivered_at: null,
-          delivered_by: null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        };
+          const randHex = Math.random().toString(36).substring(2, 8).toUpperCase();
+          const uniqueCode = `NBK-GIFT-${randHex}-${Date.now().toString(36).toUpperCase()}`;
+          const winnerId = `winner_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
-        await supabase.from('gift_winners').insert(winnerRecord);
+          winnerRecord = {
+            id: winnerId,
+            unique_code: uniqueCode,
+            user_id: userId,
+            user_name: userMetadata?.full_name || 'Usuario NewBank',
+            user_email: userMetadata?.email || '',
+            user_phone: userMetadata?.phone || '',
+            gift_id: giftObj.id,
+            gift_name_snapshot: giftObj.name,
+            gift_image_snapshot: giftObj.image_url,
+            status: 'PENDING',
+            won_at: new Date().toISOString(),
+            delivered_at: null,
+            delivered_by: null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
 
-        nextAvailableAt = new Date(Date.now() + cooldownMinutes * 60 * 1000).toISOString();
-        await supabase.from('user_roulette_status').upsert({
-          user_id: userId,
-          next_available_at: nextAvailableAt,
-          extra_attempt_available: false,
-          updated_at: new Date().toISOString()
-        });
+          await supabase.from('gift_winners').insert(winnerRecord);
+
+          nextAvailableAt = new Date(Date.now() + cooldownMinutes * 60 * 1000).toISOString();
+          await supabase.from('user_roulette_status').upsert({
+            user_id: userId,
+            next_available_at: nextAvailableAt,
+            extra_attempt_available: false,
+            updated_at: new Date().toISOString()
+          });
+        }
       }
     }
 

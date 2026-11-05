@@ -190,10 +190,10 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
     }, 400);
   };
 
-  // Handle "Comprar Kit Personal"
+  // Handle "Comprar Kit Personal" -> navigate to home section (/#/)
   const handleBuyKit = () => {
     setShowResultModal(false);
-    navigate('/store');
+    navigate('/');
   };
 
   const unclaimedCount = myPrizes.filter((p) => p.status === 'PENDING').length;

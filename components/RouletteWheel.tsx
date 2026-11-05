@@ -139,8 +139,8 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
     }
   };
 
-  // Render the circular wheel on canvas with maximized space utilization
-  const drawWheel = (rotationDegrees: number) => {
+  // Render the circular wheel on canvas with maximized space utilization and dynamic image zoom
+  const drawWheel = (rotationDegrees: number, animTime: number = performance.now()) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -179,7 +179,7 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
     ctx.strokeStyle = '#fde68a';
     ctx.stroke();
 
-    // Dynamic sizing based on slice count for optimal visibility
+    // Dynamic base sizing based on slice count
     const badgeRadius =
       numSlices <= 6 ? 42 : numSlices <= 8 ? 38 : numSlices <= 10 ? 34 : 30;
     const badgeX = radius * 0.74; // Position in the wide outer sector (~280px)
@@ -252,39 +252,45 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
       ctx.restore();
 
       // ==========================================
-      // 2. IMAGE / BADGE RENDERING (Large & Prominent)
+      // 2. DYNAMIC IMAGE / BADGE RENDERING
+      // (Randomized Pulsating Zoom Animation for Gifts)
       // ==========================================
       const cachedImg =
         slice.image_url ? imagesCacheRef.current.get(slice.image_url) : null;
       const hasImage = Boolean(cachedImg && cachedImg.complete && cachedImg.naturalWidth > 0);
 
       if (slice.type === 'gift') {
+        // Random phase offset per slice to create asynchronous pulsing zoom animation
+        const pulseVal = Math.sin((animTime / 350) + i * 2.39);
+        const zoomFactor = 1.0 + Math.max(0, pulseVal) * 0.35; // Pulsate up to +35% size
+        const currentBadgeRadius = badgeRadius * zoomFactor;
+
         // Pure white high-contrast circular card disc
         ctx.save();
         ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
         ctx.shadowBlur = 10;
         ctx.shadowOffsetY = 2;
         ctx.beginPath();
-        ctx.arc(badgeX, 0, badgeRadius, 0, Math.PI * 2);
+        ctx.arc(badgeX, 0, currentBadgeRadius, 0, Math.PI * 2);
         ctx.fillStyle = '#ffffff';
         ctx.fill();
         ctx.restore();
 
-        // Elegant gold/white rim around image badge
+        // Elegant gold rim around image badge
         ctx.beginPath();
-        ctx.arc(badgeX, 0, badgeRadius, 0, Math.PI * 2);
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = '#fef08a';
+        ctx.arc(badgeX, 0, currentBadgeRadius, 0, Math.PI * 2);
+        ctx.lineWidth = pulseVal > 0.3 ? 3.5 : 2.5;
+        ctx.strokeStyle = pulseVal > 0.3 ? '#fbbf24' : '#fef08a';
         ctx.stroke();
 
         if (hasImage && cachedImg) {
           // Render product photo clipped to circle with aspect ratio preservation
           ctx.save();
           ctx.beginPath();
-          ctx.arc(badgeX, 0, badgeRadius - 2, 0, Math.PI * 2);
+          ctx.arc(badgeX, 0, currentBadgeRadius - 2, 0, Math.PI * 2);
           ctx.clip();
 
-          const targetSize = (badgeRadius - 2) * 2;
+          const targetSize = (currentBadgeRadius - 2) * 2;
           const nw = cachedImg.naturalWidth;
           const nh = cachedImg.naturalHeight;
           const scale = Math.max(targetSize / nw, targetSize / nh);
@@ -301,7 +307,7 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
             );
           } catch {
             // Safe fallback if cross-origin image triggers canvas security
-            ctx.font = `${Math.round(badgeRadius * 1.1)}px sans-serif`;
+            ctx.font = `${Math.round(currentBadgeRadius * 1.1)}px sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText('🎁', badgeX, 2);
@@ -310,7 +316,7 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
         } else {
           // Fallback gift box emoji when image is not loaded
           ctx.save();
-          ctx.font = `${Math.round(badgeRadius * 1.1)}px sans-serif`;
+          ctx.font = `${Math.round(currentBadgeRadius * 1.1)}px sans-serif`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText('🎁', badgeX, 2);
@@ -377,10 +383,19 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
     ctx.restore(); // Restore wheel rotation
   };
 
-  // Re-draw when slices, image loads, or rotation changes
+  // Continuous animation frame loop for dynamic pulsing gift zoom when idle
   useEffect(() => {
-    drawWheel(currentRotationRef.current);
-  }, [slices, imagesLoaded]);
+    if (isSpinning) return;
+
+    let animId: number;
+    const loop = (time: number) => {
+      drawWheel(currentRotationRef.current, time);
+      animId = requestAnimationFrame(loop);
+    };
+
+    animId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(animId);
+  }, [isSpinning, slices, imagesLoaded]);
 
   // Execute smooth rotation animation when isSpinning and targetIndex are ready
   useEffect(() => {
@@ -420,7 +435,7 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
 
       const currentAngle = startRotation + totalDistance * easedProgress;
       currentRotationRef.current = currentAngle;
-      drawWheel(currentAngle);
+      drawWheel(currentAngle, currentTime);
 
       // Sound tick check
       const normalizedAngle = (currentAngle % 360 + 360) % 360;
@@ -436,7 +451,7 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
         animFrameRef.current = requestAnimationFrame(animate);
       } else {
         currentRotationRef.current = finalRotation;
-        drawWheel(finalRotation);
+        drawWheel(finalRotation, currentTime);
         onSpinEnd();
       }
     };
