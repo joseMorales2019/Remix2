@@ -186,7 +186,8 @@ export const rouletteService = {
   async getSettings(): Promise<RouletteSettings> {
     try {
       const res = await fetch(`${API_BASE}/settings`);
-      if (res.ok) {
+      const contentType = res.headers.get('content-type');
+      if (res.ok && contentType && contentType.includes('application/json')) {
         return await res.json();
       }
     } catch (e) {
@@ -212,7 +213,8 @@ export const rouletteService = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ settings, adminUser })
       });
-      if (res.ok) {
+      const contentType = res.headers.get('content-type');
+      if (res.ok && contentType && contentType.includes('application/json')) {
         return await res.json();
       }
     } catch (e) {
@@ -254,7 +256,8 @@ export const rouletteService = {
   async getGifts(admin = false): Promise<RouletteGift[]> {
     try {
       const res = await fetch(`${API_BASE}/gifts?admin=${admin ? 'true' : 'false'}`);
-      if (res.ok) {
+      const contentType = res.headers.get('content-type');
+      if (res.ok && contentType && contentType.includes('application/json')) {
         return await res.json();
       }
     } catch (e) {
@@ -286,7 +289,8 @@ export const rouletteService = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ gift, adminUser })
       });
-      if (res.ok) {
+      const contentType = res.headers.get('content-type');
+      if (res.ok && contentType && contentType.includes('application/json')) {
         return await res.json();
       }
     } catch (e) {
@@ -386,7 +390,8 @@ export const rouletteService = {
   async getOptions(): Promise<RouletteOption[]> {
     try {
       const res = await fetch(`${API_BASE}/options`);
-      if (res.ok) {
+      const contentType = res.headers.get('content-type');
+      if (res.ok && contentType && contentType.includes('application/json')) {
         return await res.json();
       }
     } catch (e) {
@@ -412,7 +417,8 @@ export const rouletteService = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ option, adminUser })
       });
-      if (res.ok) {
+      const contentType = res.headers.get('content-type');
+      if (res.ok && contentType && contentType.includes('application/json')) {
         return await res.json();
       }
     } catch (e) {
@@ -437,7 +443,8 @@ export const rouletteService = {
   async getUserStatus(userId: string): Promise<UserRouletteStatus> {
     try {
       const res = await fetch(`${API_BASE}/user-status/${userId}`);
-      if (res.ok) {
+      const contentType = res.headers.get('content-type');
+      if (res.ok && contentType && contentType.includes('application/json')) {
         return await res.json();
       }
     } catch (e) {
@@ -508,12 +515,15 @@ export const rouletteService = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, isExtraAttempt, userMetadata })
       });
-      if (res.ok) {
+      const contentType = res.headers.get('content-type');
+      if (res.ok && contentType && contentType.includes('application/json')) {
         return await res.json();
       }
-      const data = await res.json().catch(() => ({}));
-      if (data.error && res.status !== 404) {
-        throw new Error(data.error);
+      if (contentType && contentType.includes('application/json')) {
+        const data = await res.json().catch(() => ({}));
+        if (data.error && res.status !== 404) {
+          throw new Error(data.error);
+        }
       }
     } catch (e: any) {
       if (e.message && !e.message.includes('404') && !e.message.includes('Failed to fetch') && !e.message.includes('Unexpected token')) {
@@ -599,8 +609,7 @@ export const rouletteService = {
       }
     }
 
-    // SUPERVISION FILTER 2: Real-time Database Stock Interception
-    // Before awarding a gift, query live inventory from Supabase database to prevent race conditions & over-granting
+    // SUPERVISION FILTER: Real-time Database Stock Interception
     if (selectedSlice.type === 'gift') {
       try {
         const { data: liveGift, error: fetchErr } = await supabase
@@ -634,7 +643,7 @@ export const rouletteService = {
         selectedSlice = fallbackNoPrize;
         sliceIndex = wheelSlices.findIndex(s => s.id === selectedSlice.id);
       } else {
-        // SUPERVISION STEP 3: Atomic stock update with available_quantity > 0 condition
+        // Atomic stock update with available_quantity > 0 condition
         const newAvail = Math.max(0, giftObj.available_quantity - 1);
         const newWon = (giftObj.won_quantity || 0) + 1;
 
@@ -747,7 +756,8 @@ export const rouletteService = {
   async getMyPrizes(userId: string): Promise<GiftWinner[]> {
     try {
       const res = await fetch(`${API_BASE}/my-prizes/${userId}`);
-      if (res.ok) {
+      const contentType = res.headers.get('content-type');
+      if (res.ok && contentType && contentType.includes('application/json')) {
         return await res.json();
       }
     } catch (e) {
@@ -774,7 +784,8 @@ export const rouletteService = {
   async getAllWinners(): Promise<GiftWinner[]> {
     try {
       const res = await fetch(`${API_BASE}/admin/winners`);
-      if (res.ok) {
+      const contentType = res.headers.get('content-type');
+      if (res.ok && contentType && contentType.includes('application/json')) {
         return await res.json();
       }
     } catch (e) {
@@ -804,7 +815,8 @@ export const rouletteService = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ winnerId, adminUser })
       });
-      if (res.ok) {
+      const contentType = res.headers.get('content-type');
+      if (res.ok && contentType && contentType.includes('application/json')) {
         return await res.json();
       }
     } catch (e) {
@@ -869,7 +881,8 @@ export const rouletteService = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ enabled, adminUser })
       });
-      if (res.ok) {
+      const contentType = res.headers.get('content-type');
+      if (res.ok && contentType && contentType.includes('application/json')) {
         return await res.json();
       }
     } catch (e) {
@@ -882,7 +895,8 @@ export const rouletteService = {
   async getAuditLogs(): Promise<AdministrativeAuditLog[]> {
     try {
       const res = await fetch(`${API_BASE}/admin/audit-logs`);
-      if (res.ok) {
+      const contentType = res.headers.get('content-type');
+      if (res.ok && contentType && contentType.includes('application/json')) {
         return await res.json();
       }
     } catch (e) {

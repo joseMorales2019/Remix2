@@ -67,7 +67,7 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
 
       // Direct live fetch from Supabase table 'gifts' to guarantee real-time database display
       let dbGiftsList: RouletteGift[] = [];
-      let fetchedDirectly = false;
+      let giftsFetchedDirectly = false;
       try {
         const { data: dbGifts, error: dbErr } = await supabase
           .from('gifts')
@@ -75,17 +75,32 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
           .order('created_at', { ascending: false });
         if (!dbErr && dbGifts) {
           dbGiftsList = dbGifts;
-          fetchedDirectly = true;
+          giftsFetchedDirectly = true;
         }
       } catch (err) {
-        console.warn('Direct Supabase gifts fetch failed, falling back to API:', err);
+        console.warn('Direct Supabase gifts fetch failed:', err);
+      }
+
+      // Direct live fetch from Supabase table 'gift_winners' to guarantee real-time winners display
+      let dbWinnersList: GiftWinner[] = [];
+      let winnersFetchedDirectly = false;
+      try {
+        const { data: dbWinners, error: wErr } = await supabase
+          .from('gift_winners')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (!wErr && dbWinners) {
+          dbWinnersList = dbWinners as GiftWinner[];
+          winnersFetchedDirectly = true;
+        }
+      } catch (err) {
+        console.warn('Direct Supabase winners fetch failed:', err);
       }
 
       setSettings(s);
-      // Prefer direct live database rows from Supabase when available
-      setGifts(fetchedDirectly && dbGiftsList.length > 0 ? dbGiftsList : (g.length > 0 ? g : dbGiftsList));
+      setGifts(giftsFetchedDirectly && dbGiftsList.length > 0 ? dbGiftsList : (g.length > 0 ? g : dbGiftsList));
       setOptions(o);
-      setWinners(w);
+      setWinners(winnersFetchedDirectly ? dbWinnersList : (w.length > 0 ? w : dbWinnersList));
       setAuditLogs(a);
     } catch (err) {
       console.error('Error fetching admin roulette data:', err);
@@ -97,20 +112,23 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
   useEffect(() => {
     fetchData();
 
-    // Listen to real-time changes in Supabase 'gifts' table
-    const giftsChannel = supabase
-      .channel('admin_gifts_realtime_sync')
+    // Listen to real-time changes in Supabase 'gifts' and 'gift_winners' tables
+    const rouletteChannel = supabase
+      .channel('admin_roulette_realtime_sync')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'gifts' },
-        () => {
-          fetchData();
-        }
+        () => fetchData()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'gift_winners' },
+        () => fetchData()
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(giftsChannel);
+      supabase.removeChannel(rouletteChannel);
     };
   }, []);
 
