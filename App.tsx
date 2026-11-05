@@ -815,7 +815,7 @@ const App: React.FC = () => {
             <Route path="/mis-pedidos" element={userProfile ? <UserOrders user={userProfile} /> : <Navigate to="/register" />} />
             <Route path="/donaciones" element={<DonacionesAncianos user={userProfile} />} />
             <Route path="/donar" element={<DonacionesAncianos user={userProfile} />} />
-            <Route path="/probar-suerte" element={userProfile ? <ProbarSuerte user={userProfile} /> : <Navigate to="/register" />} />
+            <Route path="/probar-suerte" element={<ProbarSuerte user={userProfile} />} />
             <Route path="/terms" element={<Terms />} />
           </Routes>
         </main>

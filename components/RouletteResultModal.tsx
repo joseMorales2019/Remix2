@@ -1,27 +1,103 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { SpinResult } from '../services/rouletteService';
+import { supabase } from '../supabase';
 
 interface RouletteResultModalProps {
   isOpen: boolean;
   result: SpinResult | null;
+  user?: any;
   ownerPhone: string;
   onClose: () => void;
   onExtraSpin: () => void;
   onBuyKit: () => void;
   onViewMyPrizes?: () => void;
+  onEmailUpdated?: (email: string) => void;
 }
 
 export const RouletteResultModal: React.FC<RouletteResultModalProps> = ({
   isOpen,
   result,
+  user,
   ownerPhone,
   onClose,
   onExtraSpin,
   onBuyKit,
-  onViewMyPrizes
+  onViewMyPrizes,
+  onEmailUpdated
 }) => {
+  const [emailInput, setEmailInput] = useState<string>('');
+  const [isSavingEmail, setIsSavingEmail] = useState<boolean>(false);
+  const [emailSaved, setEmailSaved] = useState<boolean>(false);
+  const [emailError, setEmailError] = useState<string>('');
+
+  useEffect(() => {
+    if (result?.winner_record?.user_email) {
+      setEmailInput(result.winner_record.user_email);
+      setEmailSaved(true);
+    } else if (user?.email) {
+      setEmailInput(user.email);
+      setEmailSaved(false);
+    } else {
+      setEmailInput('');
+      setEmailSaved(false);
+    }
+    setEmailError('');
+  }, [result, user]);
+
   if (!isOpen || !result) return null;
+
+  const handleSaveEmail = async () => {
+    const trimmed = emailInput.trim();
+    if (!trimmed || !trimmed.includes('@')) {
+      setEmailError('Por favor ingresa un correo electrónico válido (ej. usuario@correo.com)');
+      return;
+    }
+
+    setIsSavingEmail(true);
+    setEmailError('');
+
+    try {
+      const winnerId = result.winner_record?.id;
+      const uniqueCode = result.winner_record?.unique_code;
+
+      if (winnerId || uniqueCode) {
+        let query = supabase.from('gift_winners').update({
+          user_email: trimmed,
+          updated_at: new Date().toISOString()
+        });
+
+        if (winnerId) {
+          query = query.eq('id', winnerId);
+        } else if (uniqueCode) {
+          query = query.eq('unique_code', uniqueCode);
+        }
+
+        await query;
+      }
+
+      if (result.winner_record) {
+        result.winner_record.user_email = trimmed;
+      }
+
+      setEmailSaved(true);
+      if (onEmailUpdated) {
+        onEmailUpdated(trimmed);
+      }
+    } catch (err) {
+      console.error('Error al guardar correo del ganador:', err);
+      setEmailError('Ocurrió un error al vincular el correo. Intenta nuevamente.');
+    } finally {
+      setIsSavingEmail(false);
+    }
+  };
+
+  const handleClose = async () => {
+    if (result.result_type === 'gift' && emailInput.trim() && !emailSaved && emailInput.includes('@')) {
+      await handleSaveEmail();
+    }
+    onClose();
+  };
 
   const now = new Date();
   const dateFormatted = now.toLocaleDateString('es-SV', {
@@ -95,6 +171,41 @@ export const RouletteResultModal: React.FC<RouletteResultModalProps> = ({
                 </div>
               </div>
 
+              {/* Email Request Section */}
+              <div className="bg-blue-50/90 border border-blue-200/80 rounded-2xl p-4 text-left space-y-2 shadow-sm">
+                <label className="text-[10px] font-black uppercase text-blue-900 tracking-wider block">
+                  ✉️ Correo electrónico para entrega del premio:
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    value={emailInput}
+                    onChange={(e) => {
+                      setEmailInput(e.target.value);
+                      setEmailSaved(false);
+                      setEmailError('');
+                    }}
+                    placeholder="Ingresa tu correo (ej. usuario@correo.com)"
+                    className="flex-grow px-3 py-2 bg-white border border-blue-300 rounded-xl text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <button
+                    onClick={handleSaveEmail}
+                    disabled={isSavingEmail || !emailInput.trim()}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-black uppercase tracking-wider hover:bg-blue-700 disabled:opacity-50 transition shadow-sm shrink-0 cursor-pointer"
+                  >
+                    {isSavingEmail ? 'Guardando...' : emailSaved ? '✓ Guardado' : 'Guardar'}
+                  </button>
+                </div>
+                {emailError && (
+                  <p className="text-[10px] font-bold text-red-600">{emailError}</p>
+                )}
+                {emailSaved && (
+                  <p className="text-[10px] font-bold text-emerald-700 flex items-center gap-1">
+                    ✓ Correo electrónico vinculado correctamente a tu premio.
+                  </p>
+                )}
+              </div>
+
               {/* Prize Details & Code */}
               <div className="bg-slate-900 text-white rounded-2xl p-4 text-left space-y-2">
                 <div className="flex justify-between items-center text-xs">
@@ -112,7 +223,7 @@ export const RouletteResultModal: React.FC<RouletteResultModalProps> = ({
                 <div className="flex justify-between items-center text-xs pt-1 border-t border-white/10">
                   <span className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Número de contacto:</span>
                   <a
-                    href={`https://wa.me/${ownerPhone.replace(/\+/g, '')}?text=${encodeURIComponent(`Hola, gané el premio: ${result.gift?.name} con código ${result.winner_record?.unique_code}`)}`}
+                    href={`https://wa.me/${ownerPhone.replace(/\+/g, '')}?text=${encodeURIComponent(`Hola, gané el premio: ${result.gift?.name} con código ${result.winner_record?.unique_code} y mi correo es ${emailInput || 'registrado'}`)}`}
                     target="_blank"
                     rel="noreferrer"
                     className="font-bold text-blue-400 hover:text-blue-300 underline"
@@ -124,25 +235,25 @@ export const RouletteResultModal: React.FC<RouletteResultModalProps> = ({
 
               <div className="p-3 bg-blue-50/80 rounded-2xl border border-blue-100 text-slate-700 text-xs leading-relaxed text-left">
                 <p className="font-medium">
-                  📢 <strong>Instrucciones:</strong> Comunícate con el propietario de Newbank Store para coordinar la entrega de tu premio. Presenta tu código de premio para facilitar su identificación.
+                  📢 <strong>Instrucciones:</strong> Comunícate con el propietario de Newbank Store para coordinar la entrega de tu premio. Presenta tu código de premio y tu correo electrónico.
                 </p>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 {onViewMyPrizes && (
                   <button
-                    onClick={() => {
-                      onClose();
+                    onClick={async () => {
+                      await handleClose();
                       onViewMyPrizes();
                     }}
-                    className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-black transition shadow-lg"
+                    className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-black transition shadow-lg cursor-pointer"
                   >
                     Ver mis premios
                   </button>
                 )}
                 <button
-                  onClick={onClose}
-                  className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-700 transition shadow-lg shadow-blue-200"
+                  onClick={handleClose}
+                  className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-700 transition shadow-lg shadow-blue-200 cursor-pointer"
                 >
                   Continuar
                 </button>

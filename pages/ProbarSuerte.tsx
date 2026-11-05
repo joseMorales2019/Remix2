@@ -16,6 +16,23 @@ import {
 export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
   const navigate = useNavigate();
 
+  const [guestId] = useState<string>(() => {
+    let stored = localStorage.getItem('newbank_guest_roulette_id');
+    if (!stored) {
+      stored = 'guest_' + Math.random().toString(36).substring(2, 10) + '_' + Date.now();
+      localStorage.setItem('newbank_guest_roulette_id', stored);
+    }
+    return stored;
+  });
+
+  const activeUserId = user?.id || guestId;
+  const activeUser = user || {
+    id: guestId,
+    full_name: 'Usuario Invitado',
+    email: '',
+    phone: ''
+  };
+
   const [activeTab, setActiveTab] = useState<'wheel' | 'my_prizes'>('wheel');
   const [loading, setLoading] = useState<boolean>(true);
   const [settings, setSettings] = useState<RouletteSettings | null>(null);
@@ -48,10 +65,10 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
       setGifts(fetchedGifts);
       setOptions(fetchedOptions);
 
-      if (user?.id) {
+      if (activeUserId) {
         const [status, prizes] = await Promise.all([
-          rouletteService.getUserStatus(user.id),
-          rouletteService.getMyPrizes(user.id)
+          rouletteService.getUserStatus(activeUserId),
+          rouletteService.getMyPrizes(activeUserId)
         ]);
         setUserStatus(status);
         setMyPrizes(prizes);
@@ -68,7 +85,7 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
 
   useEffect(() => {
     fetchData();
-  }, [user?.id]);
+  }, [activeUserId]);
 
   // Live countdown timer tick
   useEffect(() => {
@@ -82,8 +99,8 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
         if (prev <= 1) {
           clearInterval(timerIntervalRef.current);
           // Refetch user status once countdown finishes
-          if (user?.id) {
-            rouletteService.getUserStatus(user.id).then((st) => setUserStatus(st));
+          if (activeUserId) {
+            rouletteService.getUserStatus(activeUserId).then((st) => setUserStatus(st));
           }
           return 0;
         }
@@ -94,7 +111,7 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
     return () => {
       if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     };
-  }, [secondsLeft, user?.id]);
+  }, [secondsLeft, activeUserId]);
 
   // Format seconds to mm:ss
   const formatCountdown = (totalSec: number) => {
@@ -126,7 +143,7 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
 
   // Handle spin button click
   const handleSpinClick = async () => {
-    if (isSpinning || !user?.id) return;
+    if (isSpinning || !activeUserId) return;
     if (secondsLeft > 0 && !isExtraAttempt) return;
 
     try {
@@ -134,10 +151,10 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
       setSpinResult(null);
 
       // Request outcome from server
-      const result = await rouletteService.spin(user.id, isExtraAttempt, {
-        full_name: user.full_name,
-        email: user.email,
-        phone: user.phone
+      const result = await rouletteService.spin(activeUserId, isExtraAttempt, {
+        full_name: activeUser.full_name,
+        email: activeUser.email,
+        phone: activeUser.phone
       });
 
       setSpinResult(result);
@@ -154,13 +171,13 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
     setShowResultModal(true);
 
     // Refresh prizes and status in background
-    if (user?.id) {
-      rouletteService.getUserStatus(user.id).then((st) => {
+    if (activeUserId) {
+      rouletteService.getUserStatus(activeUserId).then((st) => {
         setUserStatus(st);
         setIsExtraAttempt(st.extra_attempt_available);
         setSecondsLeft(st.remaining_seconds || 0);
       });
-      rouletteService.getMyPrizes(user.id).then((p) => setMyPrizes(p));
+      rouletteService.getMyPrizes(activeUserId).then((p) => setMyPrizes(p));
     }
   };
 
@@ -242,7 +259,7 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
           </div>
         ) : (
           <>
-            {/* Disclaimer when Impossible Mode is active (Section 6.3) */}
+            {/* Disclaimer when Impossible Mode is active */}
             {settings?.impossible_mode && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
@@ -429,6 +446,12 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
                                 Obtenido: {prizeDate} • {prizeTime}
                               </p>
 
+                              {prize.user_email && (
+                                <p className="text-[10px] text-blue-600 font-bold truncate">
+                                  ✉️ {prize.user_email}
+                                </p>
+                              )}
+
                               <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 mt-2">
                                 <span className="text-[8px] font-black uppercase text-slate-400 block tracking-widest">
                                   CÓDIGO DE RECLAMO:
@@ -447,7 +470,7 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
 
                             {!isDelivered ? (
                               <a
-                                href={`https://wa.me/${(settings?.owner_phone || '50370914941').replace(/\+/g, '')}?text=${encodeURIComponent(`Hola, gané el premio: ${prize.gift_name_snapshot} con código único ${prize.unique_code}`)}`}
+                                href={`https://wa.me/${(settings?.owner_phone || '50370914941').replace(/\+/g, '')}?text=${encodeURIComponent(`Hola, gané el premio: ${prize.gift_name_snapshot} con código único ${prize.unique_code} y correo ${prize.user_email || 'no especificado'}`)}`}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="px-3 py-1.5 bg-green-600 text-white rounded-xl font-black uppercase text-[10px] tracking-wider hover:bg-green-700 transition flex items-center gap-1"
@@ -475,11 +498,18 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
       <RouletteResultModal
         isOpen={showResultModal}
         result={spinResult}
+        user={activeUser}
         ownerPhone={settings?.owner_phone || '50370914941'}
         onClose={() => setShowResultModal(false)}
         onExtraSpin={handleExtraSpin}
         onBuyKit={handleBuyKit}
         onViewMyPrizes={() => setActiveTab('my_prizes')}
+        onEmailUpdated={(updatedEmail) => {
+          if (spinResult?.winner_record) {
+            spinResult.winner_record.user_email = updatedEmail;
+          }
+          rouletteService.getMyPrizes(activeUserId).then((p) => setMyPrizes(p));
+        }}
       />
     </div>
   );
