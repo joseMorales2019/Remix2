@@ -536,8 +536,8 @@ export const rouletteService = {
     const gifts = await this.getGifts(false);
     const options = await this.getOptions();
 
-    // SUPERVISION FILTER 1: Strictly exclude inactive gifts or out-of-stock gifts upfront
-    const visualGifts = gifts.filter(g => g.is_active && (g.available_quantity > 0));
+    // Preserve 1:1 visual slice alignment with client wheel
+    const visualGifts = gifts.filter(g => g.is_active);
     const visualOptions = options.filter(o => o.is_active);
 
     const wheelSlices: Array<{

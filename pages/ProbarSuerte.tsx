@@ -158,7 +158,9 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
       });
 
       setSpinResult(result);
-      setTargetIndex(result.slice_index);
+      // Guarantee 100% exact alignment between winning item and visual wheel slice
+      const exactWheelIndex = wheelSlices.findIndex(s => s.id === result.result_id);
+      setTargetIndex(exactWheelIndex >= 0 ? exactWheelIndex : result.slice_index);
     } catch (err: any) {
       setIsSpinning(false);
       alert(err.message || 'Error al intentar girar la ruleta.');
