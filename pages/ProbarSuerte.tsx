@@ -448,11 +448,15 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
                                 Obtenido: {prizeDate} • {prizeTime}
                               </p>
 
-                              {prize.user_email && (
+                              {prize.user_phone ? (
+                                <p className="text-[10px] text-emerald-600 font-bold truncate">
+                                  📱 {prize.user_phone}
+                                </p>
+                              ) : prize.user_email ? (
                                 <p className="text-[10px] text-blue-600 font-bold truncate">
                                   ✉️ {prize.user_email}
                                 </p>
-                              )}
+                              ) : null}
 
                               <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 mt-2">
                                 <span className="text-[8px] font-black uppercase text-slate-400 block tracking-widest">
@@ -472,7 +476,7 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
 
                             {!isDelivered ? (
                               <a
-                                href={`https://wa.me/${(settings?.owner_phone || '50370914941').replace(/\+/g, '')}?text=${encodeURIComponent(`Hola, gané el premio: ${prize.gift_name_snapshot} con código único ${prize.unique_code} y correo ${prize.user_email || 'no especificado'}`)}`}
+                                href={`https://wa.me/${(settings?.owner_phone || '50370914941').replace(/\+/g, '')}?text=${encodeURIComponent(`Hola, gané el premio: ${prize.gift_name_snapshot} con código único ${prize.unique_code}${prize.user_phone ? ` y mi WhatsApp es ${prize.user_phone}` : ''}`)}`}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="px-3 py-1.5 bg-green-600 text-white rounded-xl font-black uppercase text-[10px] tracking-wider hover:bg-green-700 transition flex items-center gap-1"
@@ -506,9 +510,9 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
         onExtraSpin={handleExtraSpin}
         onBuyKit={handleBuyKit}
         onViewMyPrizes={() => setActiveTab('my_prizes')}
-        onEmailUpdated={(updatedEmail) => {
+        onPhoneUpdated={(updatedPhone) => {
           if (spinResult?.winner_record) {
-            spinResult.winner_record.user_email = updatedEmail;
+            spinResult.winner_record.user_phone = updatedPhone;
           }
           rouletteService.getMyPrizes(activeUserId).then((p) => setMyPrizes(p));
         }}

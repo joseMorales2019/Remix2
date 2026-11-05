@@ -12,6 +12,7 @@ interface RouletteResultModalProps {
   onExtraSpin: () => void;
   onBuyKit: () => void;
   onViewMyPrizes?: () => void;
+  onPhoneUpdated?: (phone: string) => void;
   onEmailUpdated?: (email: string) => void;
 }
 
@@ -24,38 +25,40 @@ export const RouletteResultModal: React.FC<RouletteResultModalProps> = ({
   onExtraSpin,
   onBuyKit,
   onViewMyPrizes,
+  onPhoneUpdated,
   onEmailUpdated
 }) => {
-  const [emailInput, setEmailInput] = useState<string>('');
-  const [isSavingEmail, setIsSavingEmail] = useState<boolean>(false);
-  const [emailSaved, setEmailSaved] = useState<boolean>(false);
-  const [emailError, setEmailError] = useState<string>('');
+  const [phoneInput, setPhoneInput] = useState<string>('');
+  const [isSavingPhone, setIsSavingPhone] = useState<boolean>(false);
+  const [phoneSaved, setPhoneSaved] = useState<boolean>(false);
+  const [phoneError, setPhoneError] = useState<string>('');
 
   useEffect(() => {
-    if (result?.winner_record?.user_email) {
-      setEmailInput(result.winner_record.user_email);
-      setEmailSaved(true);
-    } else if (user?.email) {
-      setEmailInput(user.email);
-      setEmailSaved(false);
+    if (result?.winner_record?.user_phone) {
+      setPhoneInput(result.winner_record.user_phone);
+      setPhoneSaved(true);
+    } else if (user?.phone) {
+      setPhoneInput(user.phone);
+      setPhoneSaved(false);
     } else {
-      setEmailInput('');
-      setEmailSaved(false);
+      setPhoneInput('');
+      setPhoneSaved(false);
     }
-    setEmailError('');
+    setPhoneError('');
   }, [result, user]);
 
   if (!isOpen || !result) return null;
 
-  const handleSaveEmail = async () => {
-    const trimmed = emailInput.trim();
-    if (!trimmed || !trimmed.includes('@')) {
-      setEmailError('Por favor ingresa un correo electrónico válido (ej. usuario@correo.com)');
+  const handleSavePhone = async () => {
+    const trimmed = phoneInput.trim();
+    const digits = trimmed.replace(/\D/g, '');
+    if (!trimmed || digits.length < 8) {
+      setPhoneError('Por favor ingresa un número de WhatsApp válido (ej. 7845-1234 o +503 7845-1234)');
       return;
     }
 
-    setIsSavingEmail(true);
-    setEmailError('');
+    setIsSavingPhone(true);
+    setPhoneError('');
 
     try {
       const winnerId = result.winner_record?.id;
@@ -63,7 +66,7 @@ export const RouletteResultModal: React.FC<RouletteResultModalProps> = ({
 
       if (winnerId || uniqueCode) {
         let query = supabase.from('gift_winners').update({
-          user_email: trimmed,
+          user_phone: trimmed,
           updated_at: new Date().toISOString()
         });
 
@@ -77,24 +80,27 @@ export const RouletteResultModal: React.FC<RouletteResultModalProps> = ({
       }
 
       if (result.winner_record) {
-        result.winner_record.user_email = trimmed;
+        result.winner_record.user_phone = trimmed;
       }
 
-      setEmailSaved(true);
+      setPhoneSaved(true);
+      if (onPhoneUpdated) {
+        onPhoneUpdated(trimmed);
+      }
       if (onEmailUpdated) {
         onEmailUpdated(trimmed);
       }
     } catch (err) {
-      console.error('Error al guardar correo del ganador:', err);
-      setEmailError('Ocurrió un error al vincular el correo. Intenta nuevamente.');
+      console.error('Error al guardar WhatsApp del ganador:', err);
+      setPhoneError('Ocurrió un error al vincular tu WhatsApp. Intenta nuevamente.');
     } finally {
-      setIsSavingEmail(false);
+      setIsSavingPhone(false);
     }
   };
 
   const handleClose = async () => {
-    if (result.result_type === 'gift' && emailInput.trim() && !emailSaved && emailInput.includes('@')) {
-      await handleSaveEmail();
+    if (result.result_type === 'gift' && phoneInput.trim() && !phoneSaved && phoneInput.replace(/\D/g, '').length >= 8) {
+      await handleSavePhone();
     }
     onClose();
   };
@@ -171,37 +177,37 @@ export const RouletteResultModal: React.FC<RouletteResultModalProps> = ({
                 </div>
               </div>
 
-              {/* Email Request Section */}
-              <div className="bg-blue-50/90 border border-blue-200/80 rounded-2xl p-4 text-left space-y-2 shadow-sm">
-                <label className="text-[10px] font-black uppercase text-blue-900 tracking-wider block">
-                  ✉️ Correo electrónico para entrega del premio:
+              {/* WhatsApp Request Section */}
+              <div className="bg-emerald-50/90 border border-emerald-200/80 rounded-2xl p-4 text-left space-y-2 shadow-sm">
+                <label className="text-[10px] font-black uppercase text-emerald-900 tracking-wider block">
+                  📱 Número de WhatsApp para entrega del premio:
                 </label>
                 <div className="flex gap-2">
                   <input
-                    type="email"
-                    value={emailInput}
+                    type="tel"
+                    value={phoneInput}
                     onChange={(e) => {
-                      setEmailInput(e.target.value);
-                      setEmailSaved(false);
-                      setEmailError('');
+                      setPhoneInput(e.target.value);
+                      setPhoneSaved(false);
+                      setPhoneError('');
                     }}
-                    placeholder="Ingresa tu correo (ej. usuario@correo.com)"
-                    className="flex-grow px-3 py-2 bg-white border border-blue-300 rounded-xl text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Ingresa tu WhatsApp (ej. 7845-1234)"
+                    className="flex-grow px-3 py-2 bg-white border border-emerald-300 rounded-xl text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                   />
                   <button
-                    onClick={handleSaveEmail}
-                    disabled={isSavingEmail || !emailInput.trim()}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-black uppercase tracking-wider hover:bg-blue-700 disabled:opacity-50 transition shadow-sm shrink-0 cursor-pointer"
+                    onClick={handleSavePhone}
+                    disabled={isSavingPhone || !phoneInput.trim()}
+                    className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-wider hover:bg-emerald-700 disabled:opacity-50 transition shadow-sm shrink-0 cursor-pointer"
                   >
-                    {isSavingEmail ? 'Guardando...' : emailSaved ? '✓ Guardado' : 'Guardar'}
+                    {isSavingPhone ? 'Guardando...' : phoneSaved ? '✓ Guardado' : 'Guardar'}
                   </button>
                 </div>
-                {emailError && (
-                  <p className="text-[10px] font-bold text-red-600">{emailError}</p>
+                {phoneError && (
+                  <p className="text-[10px] font-bold text-red-600">{phoneError}</p>
                 )}
-                {emailSaved && (
+                {phoneSaved && (
                   <p className="text-[10px] font-bold text-emerald-700 flex items-center gap-1">
-                    ✓ Correo electrónico vinculado correctamente a tu premio.
+                    ✓ Número de WhatsApp vinculado correctamente a tu premio.
                   </p>
                 )}
               </div>
@@ -223,7 +229,7 @@ export const RouletteResultModal: React.FC<RouletteResultModalProps> = ({
                 <div className="flex justify-between items-center text-xs pt-1 border-t border-white/10">
                   <span className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Número de contacto:</span>
                   <a
-                    href={`https://wa.me/${ownerPhone.replace(/\+/g, '')}?text=${encodeURIComponent(`Hola, gané el premio: ${result.gift?.name} con código ${result.winner_record?.unique_code} y mi correo es ${emailInput || 'registrado'}`)}`}
+                    href={`https://wa.me/${ownerPhone.replace(/\+/g, '')}?text=${encodeURIComponent(`Hola, gané el premio: ${result.gift?.name} con código ${result.winner_record?.unique_code} y mi WhatsApp es ${phoneInput || 'registrado'}`)}`}
                     target="_blank"
                     rel="noreferrer"
                     className="font-bold text-blue-400 hover:text-blue-300 underline"
@@ -235,7 +241,7 @@ export const RouletteResultModal: React.FC<RouletteResultModalProps> = ({
 
               <div className="p-3 bg-blue-50/80 rounded-2xl border border-blue-100 text-slate-700 text-xs leading-relaxed text-left">
                 <p className="font-medium">
-                  📢 <strong>Instrucciones:</strong> Comunícate con el propietario de Newbank Store para coordinar la entrega de tu premio. Presenta tu código de premio y tu correo electrónico.
+                  📢 <strong>Instrucciones:</strong> Comunícate con el propietario de Newbank Store para coordinar la entrega de tu premio. Presenta tu código de premio y tu número de WhatsApp.
                 </p>
               </div>
 
