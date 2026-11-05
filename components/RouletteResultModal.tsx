@@ -33,8 +33,12 @@ export const RouletteResultModal: React.FC<RouletteResultModalProps> = ({
   const [phoneSaved, setPhoneSaved] = useState<boolean>(false);
   const [phoneError, setPhoneError] = useState<string>('');
 
+  const winnerId = result?.winner_record?.id || result?.winner_record?.unique_code;
+
   useEffect(() => {
-    if (result?.winner_record?.user_phone) {
+    if (!isOpen || !result) return;
+
+    if (result.winner_record?.user_phone) {
       setPhoneInput(result.winner_record.user_phone);
       setPhoneSaved(true);
     } else if (user?.phone) {
@@ -45,7 +49,7 @@ export const RouletteResultModal: React.FC<RouletteResultModalProps> = ({
       setPhoneSaved(false);
     }
     setPhoneError('');
-  }, [result, user]);
+  }, [isOpen, winnerId]);
 
   if (!isOpen || !result) return null;
 

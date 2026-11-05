@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { RouletteWheel, RouletteSlice } from '../components/RouletteWheel';
@@ -26,12 +26,14 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
   });
 
   const activeUserId = user?.id || guestId;
-  const activeUser = user || {
-    id: guestId,
-    full_name: 'Usuario Invitado',
-    email: '',
-    phone: ''
-  };
+  const activeUser = useMemo(() => {
+    return user || {
+      id: guestId,
+      full_name: 'Usuario Invitado',
+      email: '',
+      phone: ''
+    };
+  }, [user, guestId]);
 
   const [activeTab, setActiveTab] = useState<'wheel' | 'my_prizes'>('wheel');
   const [loading, setLoading] = useState<boolean>(true);
