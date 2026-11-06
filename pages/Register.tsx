@@ -26,10 +26,23 @@ const Register: React.FC<RegisterProps> = ({ onRegistered }) => {
 
   // Estados para Acceso con Google
   const [showGoogleModal, setShowGoogleModal] = useState(false);
-  const [googleInputEmail, setGoogleInputEmail] = useState(localStorage.getItem('newbank_last_google_email') || 'mejiajosemanuel.abc@gmail.com');
+  const [googleInputEmail, setGoogleInputEmail] = useState(() => {
+    const saved = localStorage.getItem('newbank_last_google_email');
+    if (saved && saved !== 'mejiajosemanuel.abc@gmail.com') {
+      return saved;
+    }
+    return '';
+  });
   const [googleInputName, setGoogleInputName] = useState('');
   const [googleError, setGoogleError] = useState('');
   const [googleLoading, setGoogleLoading] = useState(false);
+
+  // Limpieza preventiva de seguridad de cuenta predefinida en localStorage
+  useEffect(() => {
+    if (localStorage.getItem('newbank_last_google_email') === 'mejiajosemanuel.abc@gmail.com') {
+      localStorage.removeItem('newbank_last_google_email');
+    }
+  }, []);
 
   const profileMessages: Record<string, string> = {
     invitado: "registrate como invitado si solo quieres ver todo lo que NewBank tiene para ti",
@@ -270,6 +283,12 @@ const Register: React.FC<RegisterProps> = ({ onRegistered }) => {
     }
     setError('');
     setGoogleError('');
+    const saved = localStorage.getItem('newbank_last_google_email');
+    if (saved && saved !== 'mejiajosemanuel.abc@gmail.com') {
+      setGoogleInputEmail(saved);
+    } else {
+      setGoogleInputEmail('');
+    }
     setShowGoogleModal(true);
   };
 
@@ -1035,7 +1054,8 @@ const Register: React.FC<RegisterProps> = ({ onRegistered }) => {
             )}
 
             {/* Acceso Rápido con cuenta detectada/guardada */}
-            {localStorage.getItem('newbank_last_google_email') && (
+            {localStorage.getItem('newbank_last_google_email') && 
+             localStorage.getItem('newbank_last_google_email') !== 'mejiajosemanuel.abc@gmail.com' && (
               <div className="mb-4">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Cuenta frecuente:</p>
                 <button
