@@ -691,43 +691,7 @@ const Store: React.FC<{ user: any }> = ({ user }) => {
       onContextMenu={(e) => e.preventDefault()}
       onDragStart={(e) => e.preventDefault()}
     >
-      <AnimatePresence>
-        {!user && showLoginBanner && (
-          <motion.div 
-            initial={{ y: -150 }}
-            animate={{ y: 64 }}
-            exit={{ y: -150 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 120 }}
-            className="fixed top-0 left-0 w-full z-30 bg-gradient-to-r from-blue-600 to-indigo-700 p-4 sm:p-6 shadow-2xl border-b border-white/20 flex flex-col md:flex-row items-center justify-center gap-4 text-center md:text-left"
-          >
-            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-10 pointer-events-none"></div>
-            <div className="relative z-10">
-              <h3 className="text-xs sm:text-sm font-bold text-white mb-0.5">
-                ¡Hola! Para poder comprar o guardar productos en tu lista de deseos, solo necesitas crear una cuenta o iniciar sesión como INVITADO
-              </h3>
-              <p className="text-blue-100 text-[8px] font-black uppercase tracking-widest opacity-80">
-                Haz clic aquí y en segundos estarás listo:
-              </p>
-            </div>
-            <Link 
-              to="/register?type=invitado" 
-              className="relative z-10 whitespace-nowrap bg-white text-blue-600 px-5 py-2 rounded-xl font-black uppercase text-[9px] tracking-widest shadow-xl hover:bg-blue-50 transition-all transform active:scale-95"
-            >
-              Crear cuenta o iniciar sesión
-            </Link>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
-      {/* Trigger invisible en la esquina inferior del menú (top-16) */}
-      {!user && (
-        <div 
-          onClick={triggerBanner}
-          className="fixed top-12 left-0 w-16 h-8 z-[45] cursor-pointer pointer-events-auto"
-          title="Ayuda de inicio de sesión"
-        >
-        </div>
-      )}
 
       {notification && (
         <div className={`fixed top-20 left-1/2 -translate-x-1/2 z-[100] w-full max-w-md p-4 rounded-2xl shadow-2xl border animate-bounce-short ${notification.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' : 'bg-red-50 border-red-200 text-red-800'}`}>
