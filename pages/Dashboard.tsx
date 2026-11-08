@@ -235,69 +235,8 @@ const Dashboard: React.FC<{ user: any }> = ({ user }) => {
     };
   }, []);
 
-  const generateGreetingVideo = async (name: string) => {
-    console.log("generateGreetingVideo called for:", name);
-    
-    // Check if greeting exists in DB (skip for 9999 to force regeneration)
-    if (name !== "9999") {
-      try {
-        const resCheck = await fetch(`/api/greeting-video/${encodeURIComponent(name)}`);
-        const dataCheck = await resCheck.json();
-        console.log("Greeting check in DB result:", dataCheck);
-        if (dataCheck.exists) {
-          const url = dataCheck.video_url;
-          const config = getStoredConfig();
-          const newConfig = { ...config, video_url: url };
-          saveStoredConfig(newConfig);
-          window.dispatchEvent(new Event('avatar-config-updated'));
-          return;
-        }
-      } catch (e) {
-        console.error("Error checking greeting video:", e);
-      }
-    }
-
-    setShowGreetingIndicator(true); // Signal to AvatarSystem to show indicator
-    localStorage.setItem('show_greeting_indicator', 'true');
-    window.dispatchEvent(new Event('avatar-config-updated')); // Sync indicator state
-
-    // Call the API endpoint directly
-    console.log("Calling /api/video-start for:", name);
-    const res = await fetch("/api/video-start", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ 
-        prompt: `Friendly greeting video for ${name} speaking in Spanish ("Hola ${name}, bienvenido a NewBank"), smiling, waving at camera, warm, professional, high definition.`
-      })
-    });
-    const data = await res.json();
-    console.log("API response from /api/video-start:", data);
-    
-    if (data.success) {
-      const poll = async () => {
-        console.log("Polling /api/video-status for id:", data.id);
-        const sRes = await fetch(`/api/video-status/${data.id}?username=${encodeURIComponent(name)}`);
-        const sData = await sRes.json();
-        console.log("Poll status:", sData.status);
-        if (sData.status === "completed") {
-          const url = sData.video_url;
-          setShowGreetingIndicator(false);
-          localStorage.setItem('show_greeting_indicator', 'false');
-
-          const config = getStoredConfig();
-          const newConfig = { ...config, video_url: url };
-          saveStoredConfig(newConfig);
-          window.dispatchEvent(new Event('avatar-config-updated'));
-        } else {
-          setTimeout(poll, 3000);
-        }
-      };
-      poll();
-    } else {
-      console.error("Failed to start video generation");
-      setShowGreetingIndicator(false);
-      localStorage.setItem('show_greeting_indicator', 'false');
-    }
+  const generateGreetingVideo = async (_name: string) => {
+    return;
   };
 
   const handleUserDetected = (name: string) => {
@@ -331,107 +270,18 @@ const Dashboard: React.FC<{ user: any }> = ({ user }) => {
     setDetectedName(undefined);
   };
 
-  const generateEffectVideo = async (instructions: string) => {
-    console.log("generateEffectVideo called for:", instructions);
-    // Check if effect already exists in cache
-    const existingEffects = JSON.parse(localStorage.getItem('effect_videos') || '{}');
-    if (existingEffects[instructions]) {
-      const url = existingEffects[instructions];
-      const config = getStoredConfig();
-      const newConfig = { ...config, video_url: url };
-      saveStoredConfig(newConfig);
-      window.dispatchEvent(new Event('avatar-config-updated'));
-      return;
-    }
-
-    setShowGreetingIndicator(true);
-    localStorage.setItem('show_greeting_indicator', 'true');
-    window.dispatchEvent(new Event('avatar-config-updated'));
-
-    const finalPrompt = `${instructions}. El personaje del video debe hablar, expresarse o gesticular únicamente en idioma español (Spanish).`;
-    const res = await fetch("/api/video-start", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt: finalPrompt })
-    });
-    const data = await res.json();
-    
-    if (data.success) {
-      const poll = async () => {
-        const sRes = await fetch(`/api/video-status/${data.id}?username=${encodeURIComponent("effect_" + instructions)}`);
-        const sData = await sRes.json();
-        if (sData.status === "completed") {
-          const url = sData.video_url;
-          setShowGreetingIndicator(false);
-          localStorage.setItem('show_greeting_indicator', 'false');
-          
-          const newEffects = { ...existingEffects, [instructions]: url };
-          localStorage.setItem('effect_videos', JSON.stringify(newEffects));
-
-          const config = getStoredConfig();
-          const newConfig = { ...config, video_url: url };
-          saveStoredConfig(newConfig);
-          window.dispatchEvent(new Event('avatar-config-updated'));
-        } else {
-          setTimeout(poll, 3000);
-        }
-      };
-      poll();
-    } else {
-      setShowGreetingIndicator(false);
-      localStorage.setItem('show_greeting_indicator', 'false');
-    }
+  const generateEffectVideo = async (_instructions: string) => {
+    return;
   };
 
-  // Helper function to start an idle cycle
+  // Helper function to start an idle cycle (deshabilitado para la página principal)
   const startIdleCycle = () => {
-    const config = getStoredConfig();
-    if (config.is_avatar_visible_to_users === false || config.show_on_home === false) {
-      return;
-    }
-    const idleVideos = config.is_tiktoker_mode_enabled
-      ? Object.entries(config.video_settings || {})
-      : Object.entries(config.video_settings || {})
-          .filter(([_, settings]) => settings.is_idle === true);
-
-    if (idleVideos.length > 0) {
-      if (localStorage.getItem('show_greeting_indicator') === 'true') return;
-      const currentVideoName = config.video_url?.split('/').pop() || "";
-      
-      // Try to pick a different video to prevent stalling if possible
-      let eligibleVideos = idleVideos;
-      if (idleVideos.length > 1) {
-        eligibleVideos = idleVideos.filter(([name]) => name !== currentVideoName);
-      }
-
-      let selectedIdle = "";
-      if (config.is_tiktoker_mode_enabled) {
-        const pool: string[] = [];
-        eligibleVideos.forEach(([name, settings]) => {
-          const weight = settings.tiktoker_priority ? 5 : 1;
-          for (let i = 0; i < weight; i++) pool.push(name);
-        });
-        selectedIdle = pool[Math.floor(Math.random() * pool.length)] || idleVideos[0][0]; // Fallback to first if pool empty
-      } else {
-        const idleNames = eligibleVideos.map(([name]) => name);
-        selectedIdle = idleNames[Math.floor(Math.random() * idleNames.length)] || idleVideos[0][0]; // Fallback to first
-      }
-
-      console.log(`Starting idle cycle (${config.is_tiktoker_mode_enabled ? 'TikToker' : 'Normal'}): ${selectedIdle}`);
-      const videoUrl = `https://stqthrzbvuqcavtsonba.supabase.co/storage/v1/object/public/newbankVideoAnimadoAvatar/${selectedIdle}`;
-      
-      // Force update by including timestamp or just forcing a config change
-      const newConfig = { ...config, video_url: videoUrl };
-      saveStoredConfig(newConfig);
-      window.dispatchEvent(new Event('avatar-config-updated'));
-      lastTriggerTimeRef.current = Date.now();
-    }
+    return;
   };
 
   // Handle sequential playback of idle videos or fallback for continuous interaction
   useEffect(() => {
     const handleVideoEnded = (e: any) => {
-      // Always try to start idle cycle after a video ends, ensuring continuity
       startIdleCycle();
     };
 
@@ -439,16 +289,9 @@ const Dashboard: React.FC<{ user: any }> = ({ user }) => {
     return () => window.removeEventListener('avatar-video-ended', handleVideoEnded);
   }, []);
 
-  // Background idle check to start cycle if nothing happens for 15s
+  // Background idle check to start cycle deshabilitado
   useEffect(() => {
-    const interval = setInterval(() => {
-      const now = Date.now();
-      if (now - lastTriggerTimeRef.current > 15000) {
-        startIdleCycle();
-        lastTriggerTimeRef.current = now;
-      }
-    }, 5000);
-    return () => clearInterval(interval);
+    return;
   }, []);
 
   useEffect(() => {
@@ -693,7 +536,7 @@ const Dashboard: React.FC<{ user: any }> = ({ user }) => {
           .order('created_at', { ascending: false });
         if (data) {
           setProducts(data);
-          checkPromo(data);
+          // checkPromo deshabilitado al inicio en el dashboard
         }
       } catch (err) { console.error(err); }
       finally { setLoadingProducts(false); }
@@ -834,55 +677,13 @@ const Dashboard: React.FC<{ user: any }> = ({ user }) => {
   const [lightningTarget, setLightningTarget] = useState<string | null>(null);
   const [featuredPromoProduct, setFeaturedPromoProduct] = useState<any>(null);
 
-  const checkPromo = (allProducts: any[]) => {
-    const hasSeen = localStorage.getItem('hasSeenPromo_v2');
-    if (hasSeen || allProducts.length < 5) return;
-
-    const shuffled = [...allProducts].sort(() => 0.5 - Math.random());
-    const selected = shuffled.slice(0, 5);
-    
-    const initialAnimated: Record<string, number> = {};
-    selected.forEach(p => {
-      initialAnimated[p.id] = p.price + 1;
-    });
-    setAnimatedPrices(initialAnimated);
-
-    setTimeout(() => {
-      setShowPromoMessage(true);
-      setTimeout(() => {
-        setShowPromoMessage(false);
-        startPriceReduction(selected);
-        localStorage.setItem('hasSeenPromo_v2', 'true');
-      }, 3000);
-    }, 1500);
+  const checkPromo = (_allProducts: any[]) => {
+    // Deshabilitado: Ya no se ejecutan las tarjetas al inicio en el dashboard
+    return;
   };
 
-  const startPriceReduction = async (selectedProducts: any[]) => {
-    for (const product of selectedProducts) {
-      setFeaturedPromoProduct(product);
-      setLightningTarget(product.id);
-      await new Promise(r => setTimeout(r, 600));
-      
-      let current = product.price + 1;
-      const target = product.price;
-      
-      const interval = setInterval(() => {
-        current = Math.max(target, current - 0.01);
-        setAnimatedPrices(prev => ({
-          ...prev,
-          [product.id]: current
-        }));
-        
-        if (current <= target) {
-          clearInterval(interval);
-        }
-      }, 10);
-      
-      await new Promise(r => setTimeout(r, 1500));
-      setLightningTarget(null);
-      setFeaturedPromoProduct(null);
-      await new Promise(r => setTimeout(r, 400));
-    }
+  const startPriceReduction = async (_selectedProducts: any[]) => {
+    return;
   };
 
   const handleMouseEnter = (product: any) => {
@@ -953,53 +754,8 @@ const Dashboard: React.FC<{ user: any }> = ({ user }) => {
 
   return (
     <>
-      <InteractiveDialogue 
-        isOpen={activeDialogueUser !== null && avatarConfig?.is_avatar_visible_to_users !== false && avatarConfig?.show_on_home !== false} 
-        onClose={() => setActiveDialogueUser(null)} 
-        detectedUser={activeDialogueUser || { name: '', fullName: '' }} 
-        products={products}
-      />
-
+      {/* Ya no se ejecuta la funcionalidad del avatar en la página principal */}
       <AdminAvatarPanel user={user} />
-
-      {(avatarConfig?.is_avatar_visible_to_users !== false && avatarConfig?.show_on_home !== false) && (
-        <motion.div
-           drag
-           dragMomentum={false}
-           animate={avatarControls}
-           onDragEnd={async (event, info) => {
-             const { point } = info;
-             // Si el mouse/dedo se suelta cerca del borde derecho
-             if (point.x > window.innerWidth - 150) {
-               setIsAvatarCollapsed(true);
-               // Asumiendo que el offset inicial es 0 (ubicado right-4 y bottom-4).
-               // Lo movemos a la derecha para ocultarlo parcialmente.
-               await avatarControls.start({ x: window.innerWidth > 768 ? 240 : 180, transition: { type: 'spring', bounce: 0.2, duration: 0.6 } });
-             } else {
-               setIsAvatarCollapsed(false);
-             }
-           }}
-           className="fixed bottom-4 right-4 z-[9999] pointer-events-auto cursor-grab active:cursor-grabbing flex flex-col items-center justify-center overflow-visible"
-        >
-          {isAvatarCollapsed && (
-            <div 
-              className="absolute -left-12 top-1/2 -translate-y-1/2 bg-white/90 p-3 rounded-l-xl shadow-xl cursor-pointer border border-slate-200"
-              onClick={() => {
-                setIsAvatarCollapsed(false);
-                avatarControls.start({ x: 0, y: 0, transition: { type: 'spring', bounce: 0.2, duration: 0.6 } });
-              }}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-emerald-600"><path d="m15 18-6-6 6-6"/></svg>
-            </div>
-          )}
-          <div className={`transition-opacity duration-300 ${isAvatarCollapsed ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
-            <SmartAvatarBubble 
-              detectedUser={user || { name: 'Visitante', fullName: 'Visitante Invitado' }} 
-              scenario="greeting" 
-            />
-          </div>
-        </motion.div>
-      )}
 
       <AnimatePresence>
         {showTextScanner && (
@@ -1119,90 +875,7 @@ const Dashboard: React.FC<{ user: any }> = ({ user }) => {
         )}
       </AnimatePresence>
 
-      <AnimatePresence>
-        {featuredPromoProduct && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.5, rotateY: 90 }}
-            animate={{ opacity: 1, scale: 1, rotateY: 0 }}
-            exit={{ opacity: 0, scale: 0.5, rotateY: -90 }}
-            className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md"
-          >
-            <div className="bg-white rounded-[2.5rem] p-8 max-w-sm w-full shadow-2xl border-4 border-yellow-400 relative overflow-hidden">
-              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-yellow-400 via-white to-yellow-400 animate-pulse"></div>
-              <div className="aspect-square rounded-2xl overflow-hidden mb-6 shadow-inner bg-slate-50">
-                <img 
-                  src={featuredPromoProduct.image_urls?.[0] || 'https://picsum.photos/seed/product/800/800'} 
-                  alt={featuredPromoProduct.name}
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                  onError={(e) => {
-                    e.currentTarget.onerror = null;
-                    e.currentTarget.src = 'https://picsum.photos/seed/product/800/800';
-                  }}
-                />
-              </div>
-              <h3 className="text-2xl font-black text-slate-900 uppercase italic mb-2 text-center">{featuredPromoProduct.name}</h3>
-              <div className="flex flex-col items-center gap-2">
-                <div className="flex items-center gap-3">
-                  <span className="text-slate-400 line-through text-xl font-bold">
-                    ${(featuredPromoProduct.price + 1).toFixed(2)}
-                  </span>
-                  <span className="text-3xl font-black text-green-600 animate-bounce">
-                    ${(animatedPrices[featuredPromoProduct.id] || featuredPromoProduct.price + 1).toFixed(2)}
-                  </span>
-                </div>
-                <div className="bg-green-100 text-green-700 px-4 py-1 rounded-full text-xs font-black uppercase tracking-widest">
-                  ¡Precio Mejorado!
-                </div>
-              </div>
-              {lightningTarget === featuredPromoProduct.id && (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0 }}
-                  animate={{ opacity: [0, 1, 0, 1, 0], scale: [1, 2, 1, 2, 1] }}
-                  transition={{ duration: 0.5 }}
-                  className="absolute inset-0 pointer-events-none flex items-center justify-center text-8xl text-yellow-400/40"
-                >
-                  ⚡
-                </motion.div>
-              )}
-            </div>
-          </motion.div>
-        )}
 
-        {showPromoMessage && (
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.5, y: 50 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 1.5, y: -50 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none"
-          >
-            <div className="bg-gradient-to-br from-yellow-400 to-orange-500 p-8 rounded-[3rem] shadow-[0_0_50px_rgba(245,158,11,0.5)] border-4 border-white text-center transform -rotate-3">
-              <motion.h2 
-                animate={{ scale: [1, 1.1, 1] }}
-                transition={{ repeat: Infinity, duration: 0.5 }}
-                className="text-4xl sm:text-6xl font-black text-white uppercase italic tracking-tighter drop-shadow-lg"
-              >
-                ¡Felicidades!
-              </motion.h2>
-              <p className="text-xl sm:text-2xl font-black text-yellow-100 uppercase tracking-widest mt-2">
-                Has ganado $5.00 dólares en descuentos
-              </p>
-              <div className="mt-4 flex justify-center gap-2">
-                {[...Array(5)].map((_, i) => (
-                  <motion.span 
-                    key={i}
-                    animate={{ y: [0, -20, 0], rotate: [0, 360] }}
-                    transition={{ delay: i * 0.1, repeat: Infinity, duration: 1 }}
-                    className="text-3xl"
-                  >
-                    💰
-                  </motion.span>
-                ))}
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <AnimatePresence>
         {!user && showLoginBanner && (
