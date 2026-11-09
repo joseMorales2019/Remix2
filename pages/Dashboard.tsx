@@ -29,17 +29,23 @@ const ProductCarousel = ({ images, name }: { images: string[], name: string }) =
     return () => clearInterval(interval);
   }, [validImages.length]);
 
+  if (validImages.length === 0) {
+    return (
+      <div className="w-full h-full bg-slate-100/80 animate-pulse flex items-center justify-center text-slate-300">
+        <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        </svg>
+      </div>
+    );
+  }
+
   return (
     <div className="relative w-full h-full">
       <img 
-        src={validImages[currentIndex] || 'https://picsum.photos/seed/product/800/800'} 
+        src={validImages[currentIndex]} 
         alt={name}
         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
         referrerPolicy="no-referrer"
-        onError={(e) => {
-          e.currentTarget.onerror = null;
-          e.currentTarget.src = 'https://picsum.photos/seed/product/800/800';
-        }}
       />
       {validImages.length > 1 && (
         <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1 z-10">
@@ -75,21 +81,54 @@ interface Comment {
   created_at: string;
 }
 
-const ProductBanner = ({ products }: { products: any[] }) => {
+const ProductBanner = ({ products, loading }: { products: any[]; loading?: boolean }) => {
   const productImages = (products || [])
     .filter(p => p && (p.image_url || (p.image_urls && p.image_urls[0])))
     .map(p => p.image_url || p.image_urls[0]);
   
-  // Si no hay productos, usamos imágenes de muestra para que el usuario siempre vea el banner
-  const images = productImages.length > 0 ? productImages : [
-    'https://picsum.photos/seed/tactical1/800/800',
-    'https://picsum.photos/seed/tactical2/800/800',
-    'https://picsum.photos/seed/tactical3/800/800',
-    'https://picsum.photos/seed/tactical4/800/800',
-    'https://picsum.photos/seed/tactical5/800/800'
-  ];
+  // Guardamos en caché las imágenes de los productos reales para que en recargas o visitas posteriores no haya retraso
+  useEffect(() => {
+    if (productImages.length > 0) {
+      try {
+        localStorage.setItem('newbank_cached_banner_images', JSON.stringify(productImages.slice(0, 10)));
+      } catch (e) {
+        // Ignorar
+      }
+    }
+  }, [productImages]);
 
-  // Creamos una lista larga para el efecto de scroll infinito suave
+  // Si aún están cargando los productos desde la base de datos, usamos las imágenes previamente cacheadas
+  let images = productImages;
+  if (images.length === 0) {
+    try {
+      const cached = JSON.parse(localStorage.getItem('newbank_cached_banner_images') || '[]');
+      if (Array.isArray(cached) && cached.length > 0) {
+        images = cached;
+      }
+    } catch {
+      // Ignorar
+    }
+  }
+
+  // Si no hay imágenes reales (durante la primera carga), se muestra un esqueleto de carga y NUNCA imágenes predefinidas ajenas
+  if (images.length === 0) {
+    return (
+      <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex items-center justify-center z-0 overflow-hidden pointer-events-none select-none h-[400px]">
+        <div className="flex gap-4 sm:gap-8 px-10 items-center h-full opacity-30 animate-pulse">
+          {[...Array(5)].map((_, i) => (
+            <div 
+              key={i} 
+              className="w-44 h-60 sm:w-64 sm:h-80 bg-slate-200/60 rounded-[3rem] shadow-[0_20px_60px_rgba(0,0,0,0.04)] flex-shrink-0 border border-slate-200/40 transform scale-90 sm:scale-100"
+            />
+          ))}
+        </div>
+        <div className="absolute inset-y-0 left-0 w-1/4 bg-gradient-to-r from-slate-50 via-slate-50/80 to-transparent z-10" />
+        <div className="absolute inset-y-0 right-0 w-1/4 bg-gradient-to-l from-slate-50 via-slate-50/80 to-transparent z-10" />
+      </div>
+    );
+  }
+
+  // Lista para el carrusel infinito suave únicamente con imágenes reales de productos
   const displayImages = [...images, ...images, ...images, ...images, ...images];
 
   return (
@@ -884,7 +923,7 @@ const Dashboard: React.FC<{ user: any }> = ({ user }) => {
 
         <div className="relative text-center mb-16 py-12">
           {/* Banner de productos dinámico de fondo */}
-          <ProductBanner products={products} />
+          <ProductBanner products={products} loading={loadingProducts} />
           
           <div className="relative z-20 bg-transparent invisible">
             <h1 className="text-4xl sm:text-7xl font-black text-slate-900/90 uppercase italic tracking-tighter leading-none mb-4 drop-shadow-md mix-blend-multiply">

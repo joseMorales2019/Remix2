@@ -28,19 +28,25 @@ const ProductCarousel = ({ images, name }: { images: string[], name: string }) =
     return () => clearInterval(interval);
   }, [validImages.length]);
 
+  if (validImages.length === 0) {
+    return (
+      <div className="w-full h-full bg-slate-100/80 animate-pulse flex items-center justify-center text-slate-300">
+        <svg className="w-8 h-8 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+        </svg>
+      </div>
+    );
+  }
+
   return (
     <div className="relative w-full h-full select-none">
       <img 
-        src={validImages[currentIndex] || 'https://picsum.photos/seed/product/800/800'} 
+        src={validImages[currentIndex]} 
         alt={name}
         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 pointer-events-none"
         referrerPolicy="no-referrer"
         onContextMenu={(e) => e.preventDefault()}
         onDragStart={(e) => e.preventDefault()}
-        onError={(e) => {
-          e.currentTarget.onerror = null;
-          e.currentTarget.src = 'https://picsum.photos/seed/product/800/800';
-        }}
       />
       {validImages.length > 1 && (
         <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1 z-10">
