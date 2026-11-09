@@ -82,36 +82,58 @@ interface Comment {
 }
 
 const ProductBanner = ({ products, loading }: { products: any[]; loading?: boolean }) => {
-  const productImages = (products || [])
-    .filter(p => p && (p.image_url || (p.image_urls && p.image_urls[0])))
-    .map(p => p.image_url || p.image_urls[0]);
-  
-  // Guardamos en caché las imágenes de los productos reales para que en recargas o visitas posteriores no haya retraso
-  useEffect(() => {
-    if (productImages.length > 0) {
-      try {
-        localStorage.setItem('newbank_cached_banner_images', JSON.stringify(productImages.slice(0, 10)));
-      } catch (e) {
-        // Ignorar
-      }
-    }
-  }, [productImages]);
-
-  // Si aún están cargando los productos desde la base de datos, usamos las imágenes previamente cacheadas
-  let images = productImages;
-  if (images.length === 0) {
+  // Inicializamos las imágenes del carrusel directamente con las que están guardadas en localStorage
+  const [carouselImages, setCarouselImages] = useState<string[]>(() => {
     try {
-      const cached = JSON.parse(localStorage.getItem('newbank_cached_banner_images') || '[]');
-      if (Array.isArray(cached) && cached.length > 0) {
-        images = cached;
+      const stored = localStorage.getItem('newbank_carousel_banner_images') || localStorage.getItem('newbank_cached_banner_images');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.filter(Boolean);
+        }
       }
     } catch {
       // Ignorar
     }
-  }
+    return [];
+  });
 
-  // Si no hay imágenes reales (durante la primera carga), se muestra un esqueleto de carga y NUNCA imágenes predefinidas ajenas
-  if (images.length === 0) {
+  // Al cargar o actualizar productos reales, sincronizamos de forma idéntica sin provocar saltos ni cortes bruscos
+  useEffect(() => {
+    if (!products || products.length === 0) return;
+
+    // Extraer imágenes reales y únicas de los productos de la tienda
+    const validImages: string[] = [];
+    products.forEach((p) => {
+      const img = p?.image_url || (p?.image_urls && p?.image_urls[0]);
+      if (img && typeof img === 'string' && img.trim() !== '') {
+        const clean = img.trim();
+        if (!validImages.includes(clean)) {
+          validImages.push(clean);
+        }
+      }
+    });
+
+    if (validImages.length === 0) return;
+
+    // Comparamos el contenido exacto: si ya son las mismas que están en pantalla/localStorage,
+    // NO actualizamos el estado para no interrumpir ni reiniciar la animación del carrusel.
+    const currentSerialized = JSON.stringify(carouselImages);
+    const newSerialized = JSON.stringify(validImages);
+
+    if (currentSerialized !== newSerialized) {
+      setCarouselImages(validImages);
+      try {
+        localStorage.setItem('newbank_carousel_banner_images', newSerialized);
+        localStorage.setItem('newbank_cached_banner_images', newSerialized);
+      } catch (e) {
+        // Ignorar
+      }
+    }
+  }, [products, carouselImages]);
+
+  // Si no hay imágenes reales (únicamente en la primera carga antes de recibir productos)
+  if (carouselImages.length === 0) {
     return (
       <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex items-center justify-center z-0 overflow-hidden pointer-events-none select-none h-[400px]">
         <div className="flex gap-4 sm:gap-8 px-10 items-center h-full opacity-30 animate-pulse">
@@ -128,8 +150,12 @@ const ProductBanner = ({ products, loading }: { products: any[]; loading?: boole
     );
   }
 
-  // Lista para el carrusel infinito suave únicamente con imágenes reales de productos
-  const displayImages = [...images, ...images, ...images, ...images, ...images];
+  // Las imágenes que se muestran en el carrusel son exactamente las mismas que están guardadas en localStorage
+  let displayImages = [...carouselImages];
+  while (displayImages.length < 20 && displayImages.length > 0) {
+    displayImages = [...displayImages, ...carouselImages];
+  }
+  displayImages = [...displayImages, ...displayImages];
 
   return (
     <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 flex items-center justify-center z-0 overflow-hidden pointer-events-none select-none h-[400px]">
@@ -144,7 +170,7 @@ const ProductBanner = ({ products, loading }: { products: any[]; loading?: boole
       >
         {displayImages.map((src, i) => (
           <div 
-            key={i} 
+            key={`${src}-${i}`} 
             className="w-44 h-60 sm:w-64 sm:h-80 bg-white rounded-[3rem] shadow-[0_20px_60px_rgba(0,0,0,0.08)] flex-shrink-0 overflow-hidden border border-slate-200/50 backdrop-blur-md relative transform scale-90 sm:scale-100"
           >
             <div className="absolute inset-0 bg-gradient-to-tr from-slate-50/20 to-transparent" />
