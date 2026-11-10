@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { motion } from 'motion/react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { supabase } from '../supabase';
@@ -44,6 +45,7 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
   const [selectedCatalogProduct, setSelectedCatalogProduct] = useState<any | null>(null);
   const [catalogGiftForm, setCatalogGiftForm] = useState({
     name: '',
+    gift_class: 'product' as 'product' | 'money',
     quantity: 5,
     probability: 5,
     is_active: true
@@ -54,6 +56,7 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
     name: '',
     description: '',
     image_url: '',
+    gift_class: 'product' as 'product' | 'money',
     quantity: 5,
     probability: 5,
     is_active: true
@@ -425,6 +428,7 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
     setSelectedCatalogProduct(prod);
     setCatalogGiftForm({
       name: prod.name,
+      gift_class: 'product',
       quantity: 5,
       probability: 5,
       is_active: true
@@ -446,6 +450,7 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
         description: selectedCatalogProduct.description || '',
         image_url: imgUrl !== '' ? imgUrl : 'https://picsum.photos/seed/gift/400/400',
         gift_type: 'product' as const,
+        gift_class: catalogGiftForm.gift_class || 'product',
         initial_quantity: Number(catalogGiftForm.quantity),
         available_quantity: Number(catalogGiftForm.quantity),
         won_quantity: 0,
@@ -456,11 +461,16 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
 
       // Direct write to Supabase table 'gifts'
       try {
-        await supabase.from('gifts').upsert({
+        const payloadToDb: any = {
           ...newGiftPayload,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
-        });
+        };
+        const { error: upsertErr } = await supabase.from('gifts').upsert(payloadToDb);
+        if (upsertErr && (upsertErr.message?.includes('gift_class') || upsertErr.code === 'PGRST204')) {
+          delete payloadToDb.gift_class;
+          await supabase.from('gifts').upsert(payloadToDb);
+        }
       } catch (dbErr) {
         console.warn('Direct Supabase catalog gift upsert error:', dbErr);
       }
@@ -537,6 +547,7 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
         description: customGiftForm.description,
         image_url: customImgUrl !== '' ? customImgUrl : 'https://picsum.photos/seed/gift/400/400',
         gift_type: 'custom' as const,
+        gift_class: customGiftForm.gift_class || 'product',
         initial_quantity: Number(customGiftForm.quantity),
         available_quantity: Number(customGiftForm.quantity),
         won_quantity: 0,
@@ -547,11 +558,16 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
 
       // Direct write to Supabase table 'gifts'
       try {
-        await supabase.from('gifts').upsert({
+        const payloadToDb: any = {
           ...newCustomGift,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
-        });
+        };
+        const { error: upsertErr } = await supabase.from('gifts').upsert(payloadToDb);
+        if (upsertErr && (upsertErr.message?.includes('gift_class') || upsertErr.code === 'PGRST204')) {
+          delete payloadToDb.gift_class;
+          await supabase.from('gifts').upsert(payloadToDb);
+        }
       } catch (dbErr) {
         console.warn('Direct Supabase custom gift upsert error:', dbErr);
       }
@@ -563,6 +579,7 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
         name: '',
         description: '',
         image_url: '',
+        gift_class: 'product',
         quantity: 5,
         probability: 5,
         is_active: true
@@ -582,14 +599,20 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
     try {
       const sanitizedGift = {
         ...gift,
+        gift_class: gift.gift_class || 'product',
         product_id: (gift.product_id && gift.product_id.trim() !== '') ? gift.product_id : null,
         image_url: (gift.image_url || '').trim() || 'https://picsum.photos/seed/gift/400/400'
       };
       try {
-        await supabase.from('gifts').upsert({
+        const payloadToDb: any = {
           ...sanitizedGift,
           updated_at: new Date().toISOString()
-        });
+        };
+        const { error: upsertErr } = await supabase.from('gifts').upsert(payloadToDb);
+        if (upsertErr && (upsertErr.message?.includes('gift_class') || upsertErr.code === 'PGRST204')) {
+          delete payloadToDb.gift_class;
+          await supabase.from('gifts').upsert(payloadToDb);
+        }
       } catch (dbErr) {
         console.warn('Direct Supabase gift update error:', dbErr);
       }
@@ -1002,6 +1025,7 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
                       <tr className="bg-slate-50 text-[10px] font-black uppercase text-slate-400 tracking-widest border-b border-slate-100">
                         <th className="px-6 py-4">Regalo</th>
                         <th className="px-6 py-4">Tipo</th>
+                        <th className="px-6 py-4 text-center">Clase</th>
                         <th className="px-6 py-4 text-center">Inicial</th>
                         <th className="px-6 py-4 text-center">Disponible</th>
                         <th className="px-6 py-4 text-center">Ganados</th>
@@ -1041,6 +1065,23 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
                             <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-slate-100 text-slate-600">
                               {gift.gift_type === 'product' ? 'Catálogo' : 'Personalizado'}
                             </span>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <select
+                              value={gift.gift_class || 'product'}
+                              onChange={(e) => {
+                                const newClass = e.target.value as 'product' | 'money';
+                                handleUpdateGift({ ...gift, gift_class: newClass });
+                              }}
+                              className={`px-2.5 py-1 rounded-xl text-[10px] font-black uppercase border transition cursor-pointer outline-none ${
+                                gift.gift_class === 'money'
+                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                  : 'bg-blue-50 text-blue-800 border-blue-200'
+                              }`}
+                            >
+                              <option value="product">📦 Producto</option>
+                              <option value="money">💵 Dinero</option>
+                            </select>
                           </td>
                           <td className="px-6 py-4 text-center font-bold text-slate-500">{gift.initial_quantity}</td>
                           <td className="px-6 py-4 text-center">
@@ -1089,7 +1130,7 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
                       ))}
                       {gifts.length === 0 && (
                         <tr>
-                          <td colSpan={9} className="py-12 text-center text-slate-400 font-bold uppercase text-xs">
+                          <td colSpan={10} className="py-12 text-center text-slate-400 font-bold uppercase text-xs">
                             No hay regalos registrados aún. Agrega productos del catálogo o crea regalos nuevos.
                           </td>
                         </tr>
@@ -1616,30 +1657,44 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
 
       {/* MODAL: SELECCIONAR PRODUCTO DEL CATÁLOGO EXISTENTE */}
       {showCatalogModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-2xl shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col">
-            <div className="flex justify-between items-center border-b pb-4 mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-hidden">
+          <motion.div
+            drag
+            dragMomentum={false}
+            className="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-2xl shadow-2xl border border-slate-200 max-h-[90vh] flex flex-col"
+          >
+            <div className="flex justify-between items-center border-b pb-4 mb-4 cursor-grab active:cursor-grabbing select-none">
               <div>
-                <h3 className="font-black uppercase text-slate-900 text-lg">
-                  Agregar Producto Existente como Regalo
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-black uppercase text-slate-900 text-lg">
+                    Agregar Producto Existente como Regalo
+                  </h3>
+                  <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full flex items-center gap-1">
+                    <span>⋮⋮</span> Arrastrable
+                  </span>
+                </div>
                 <p className="text-xs text-slate-500">
                   Selecciona del catálogo. Esto no altera el precio ni inventario de la tienda.
                 </p>
               </div>
               <button
+                type="button"
+                onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => {
                   setShowCatalogModal(false);
                   setSelectedCatalogProduct(null);
                 }}
-                className="text-slate-400 hover:text-slate-800 text-lg font-bold"
+                className="text-slate-400 hover:text-slate-800 text-lg font-bold p-1 cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
             {!selectedCatalogProduct ? (
-              <div className="space-y-4 flex-grow overflow-y-auto">
+              <div
+                onPointerDown={(e) => e.stopPropagation()}
+                className="space-y-4 flex-grow overflow-y-auto"
+              >
                 <input
                   type="text"
                   value={catalogSearch}
@@ -1697,6 +1752,20 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
                   />
                 </div>
 
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">
+                    Clase de Regalo
+                  </label>
+                  <select
+                    value={catalogGiftForm.gift_class}
+                    onChange={(e) => setCatalogGiftForm({ ...catalogGiftForm, gift_class: e.target.value as 'product' | 'money' })}
+                    className="w-full p-3 bg-slate-50 border rounded-xl text-xs font-bold"
+                  >
+                    <option value="product">📦 Clase Producto (Artículo físico / catálogo)</option>
+                    <option value="money">💵 Clase Dinero (Transferencia bancaria directa)</option>
+                  </select>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">
@@ -1732,40 +1801,51 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
                   <button
                     type="button"
                     onClick={() => setSelectedCatalogProduct(null)}
-                    className="flex-1 py-3 bg-slate-100 text-slate-700 rounded-xl text-xs font-black uppercase"
+                    className="flex-1 py-3 bg-slate-100 text-slate-700 rounded-xl text-xs font-black uppercase cursor-pointer"
                   >
                     Cambiar Producto
                   </button>
                   <button
                     type="submit"
                     disabled={actionLoading === 'saving-catalog-gift'}
-                    className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-xs font-black uppercase shadow-lg shadow-blue-200"
+                    className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-xs font-black uppercase shadow-lg shadow-blue-200 cursor-pointer"
                   >
                     {actionLoading === 'saving-catalog-gift' ? 'Guardando...' : 'Confirmar como Regalo'}
                   </button>
                 </div>
               </form>
             )}
-          </div>
+          </motion.div>
         </div>
       )}
 
       {/* MODAL: AGREGAR REGALO NUEVO (PERSONALIZADO) */}
       {showNewGiftModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-lg shadow-2xl border border-slate-200">
-            <div className="flex justify-between items-center border-b pb-4 mb-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-hidden">
+          <motion.div
+            drag
+            dragMomentum={false}
+            className="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-lg shadow-2xl border border-slate-200"
+          >
+            <div className="flex justify-between items-center border-b pb-4 mb-4 cursor-grab active:cursor-grabbing select-none">
               <div>
-                <h3 className="font-black uppercase text-slate-900 text-lg">
-                  Agregar Regalo Nuevo
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-black uppercase text-slate-900 text-lg">
+                    Agregar Regalo Nuevo
+                  </h3>
+                  <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full flex items-center gap-1">
+                    <span>⋮⋮</span> Arrastrable
+                  </span>
+                </div>
                 <p className="text-xs text-slate-500">
                   Registra un regalo independiente del catálogo comercial.
                 </p>
               </div>
               <button
+                type="button"
+                onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => setShowNewGiftModal(false)}
-                className="text-slate-400 hover:text-slate-800 text-lg font-bold"
+                className="text-slate-400 hover:text-slate-800 text-lg font-bold p-1 cursor-pointer"
               >
                 ✕
               </button>
@@ -1819,6 +1899,20 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
                 </div>
               </div>
 
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">
+                  Clase de Regalo
+                </label>
+                <select
+                  value={customGiftForm.gift_class}
+                  onChange={(e) => setCustomGiftForm({ ...customGiftForm, gift_class: e.target.value as 'product' | 'money' })}
+                  className="w-full p-3 bg-slate-50 border rounded-xl text-xs font-bold"
+                >
+                  <option value="product">📦 Clase Producto (Artículo físico / personalizado)</option>
+                  <option value="money">💵 Clase Dinero (Transferencia bancaria directa)</option>
+                </select>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">Cantidad Total Disponible</label>
@@ -1850,34 +1944,45 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
                 <button
                   type="button"
                   onClick={() => setShowNewGiftModal(false)}
-                  className="flex-1 py-3 bg-slate-100 text-slate-700 rounded-xl text-xs font-black uppercase"
+                  className="flex-1 py-3 bg-slate-100 text-slate-700 rounded-xl text-xs font-black uppercase cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={actionLoading === 'saving-custom-gift'}
-                  className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-xs font-black uppercase shadow-lg shadow-blue-200"
+                  className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-xs font-black uppercase shadow-lg shadow-blue-200 cursor-pointer"
                 >
                   {actionLoading === 'saving-custom-gift' ? 'Guardando...' : 'Crear Regalo'}
                 </button>
               </div>
             </form>
-          </div>
+          </motion.div>
         </div>
       )}
 
       {/* MODAL: EDITAR REGALO EXISTENTE */}
       {editingGift && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
-          <div className="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-lg shadow-2xl border border-slate-200">
-            <div className="flex justify-between items-center border-b pb-4 mb-4">
-              <h3 className="font-black uppercase text-slate-900 text-lg">
-                Editar Regalo: {editingGift.name}
-              </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-hidden">
+          <motion.div
+            drag
+            dragMomentum={false}
+            className="bg-white rounded-3xl p-6 sm:p-8 w-full max-w-lg shadow-2xl border border-slate-200"
+          >
+            <div className="flex justify-between items-center border-b pb-4 mb-4 cursor-grab active:cursor-grabbing select-none">
+              <div className="flex items-center gap-2">
+                <h3 className="font-black uppercase text-slate-900 text-lg">
+                  Editar Regalo: {editingGift.name}
+                </h3>
+                <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full flex items-center gap-1">
+                  <span>⋮⋮</span> Arrastrable
+                </span>
+              </div>
               <button
+                type="button"
+                onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => setEditingGift(null)}
-                className="text-slate-400 hover:text-slate-800 text-lg font-bold"
+                className="text-slate-400 hover:text-slate-800 text-lg font-bold p-1 cursor-pointer"
               >
                 ✕
               </button>
@@ -1892,6 +1997,20 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
                   onChange={(e) => setEditingGift({ ...editingGift, name: e.target.value })}
                   className="w-full p-3 bg-slate-50 border rounded-xl text-xs font-bold"
                 />
+              </div>
+
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-400 block mb-1">
+                  Clase de Regalo
+                </label>
+                <select
+                  value={editingGift.gift_class || 'product'}
+                  onChange={(e) => setEditingGift({ ...editingGift, gift_class: e.target.value as 'product' | 'money' })}
+                  className="w-full p-3 bg-slate-50 border rounded-xl text-xs font-bold"
+                >
+                  <option value="product">📦 Clase Producto (Artículo físico / catálogo)</option>
+                  <option value="money">💵 Clase Dinero (Transferencia bancaria directa)</option>
+                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -1937,20 +2056,20 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
                 <button
                   type="button"
                   onClick={() => setEditingGift(null)}
-                  className="flex-1 py-3 bg-slate-100 text-slate-700 rounded-xl text-xs font-black uppercase"
+                  className="flex-1 py-3 bg-slate-100 text-slate-700 rounded-xl text-xs font-black uppercase cursor-pointer"
                 >
                   Cancelar
                 </button>
                 <button
                   type="button"
                   onClick={() => handleUpdateGift(editingGift)}
-                  className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-xs font-black uppercase shadow-lg shadow-blue-200"
+                  className="flex-1 py-3 bg-blue-600 text-white rounded-xl text-xs font-black uppercase shadow-lg shadow-blue-200 cursor-pointer"
                 >
                   Guardar Cambios
                 </button>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       )}
     </div>

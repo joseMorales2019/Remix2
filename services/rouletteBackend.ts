@@ -44,6 +44,7 @@ interface StoreData {
     description?: string;
     image_url: string;
     gift_type: 'product' | 'custom';
+    gift_class?: 'product' | 'money';
     initial_quantity: number;
     available_quantity: number;
     won_quantity: number;
@@ -63,6 +64,10 @@ interface StoreData {
     gift_id: string;
     gift_name_snapshot: string;
     gift_image_snapshot: string;
+    gift_class_snapshot?: 'product' | 'money';
+    bank_account?: string;
+    bank_name?: string;
+    show_in_monthly_winners?: boolean;
     status: 'PENDING' | 'DELIVERED';
     won_at: string;
     delivered_at?: string | null;
@@ -142,6 +147,7 @@ const DEFAULT_STORE: StoreData = {
       description: 'Kit de cuidado y estilo exclusivo NewBank Store',
       image_url: 'https://stqthrzbvuqcavtsonba.supabase.co/storage/v1/object/public/NewBankImageProductos/product_1793726811854_0.webp',
       gift_type: 'product',
+      gift_class: 'product',
       initial_quantity: 15,
       available_quantity: 15,
       won_quantity: 0,
@@ -158,6 +164,7 @@ const DEFAULT_STORE: StoreData = {
       description: 'Audífonos inalámbricos de alta fidelidad con estuche de carga',
       image_url: 'https://m.media-amazon.com/images/I/61OS-Vh3NOL.jpg',
       gift_type: 'product',
+      gift_class: 'product',
       initial_quantity: 5,
       available_quantity: 5,
       won_quantity: 0,
@@ -174,6 +181,7 @@ const DEFAULT_STORE: StoreData = {
       description: 'Smartwatch multifuncional con monitoreo deportivo y llamadas',
       image_url: 'https://cdn.dotpe.in/longtail/store-items/7720394/d2ylpR50.webp',
       gift_type: 'product',
+      gift_class: 'product',
       initial_quantity: 3,
       available_quantity: 3,
       won_quantity: 0,
@@ -367,6 +375,7 @@ export function registerRouletteRoutes(app: express.Application, io: Server) {
         savedGift = {
           ...prev,
           ...gift,
+          gift_class: gift.gift_class || prev.gift_class || 'product',
           available_quantity: newAvail,
           probability: Math.min(100, Math.max(0, Number(gift.probability))),
           updated_at: new Date().toISOString()
@@ -393,6 +402,7 @@ export function registerRouletteRoutes(app: express.Application, io: Server) {
           description: gift.description || '',
           image_url: gift.image_url || 'https://picsum.photos/seed/gift/400/400',
           gift_type: gift.gift_type || 'custom',
+          gift_class: gift.gift_class || 'product',
           initial_quantity: initialQty,
           available_quantity: initialQty,
           won_quantity: 0,
@@ -418,13 +428,14 @@ export function registerRouletteRoutes(app: express.Application, io: Server) {
 
       // Synchronize directly with Supabase database 'gifts' table
       try {
-        await supabase.from('gifts').upsert({
+        const giftPayload: any = {
           id: savedGift.id,
           product_id: savedGift.product_id || null,
           name: savedGift.name,
           description: savedGift.description || '',
           image_url: savedGift.image_url,
           gift_type: savedGift.gift_type,
+          gift_class: savedGift.gift_class || 'product',
           initial_quantity: savedGift.initial_quantity,
           available_quantity: savedGift.available_quantity,
           won_quantity: savedGift.won_quantity || 0,
@@ -433,7 +444,12 @@ export function registerRouletteRoutes(app: express.Application, io: Server) {
           is_active: savedGift.is_active,
           created_at: savedGift.created_at || new Date().toISOString(),
           updated_at: new Date().toISOString()
-        });
+        };
+        const { error: upsertErr } = await supabase.from('gifts').upsert(giftPayload);
+        if (upsertErr && (upsertErr.message?.includes('gift_class') || upsertErr.code === 'PGRST204')) {
+          delete giftPayload.gift_class;
+          await supabase.from('gifts').upsert(giftPayload);
+        }
       } catch (dbErr) {
         console.warn('Error syncing gift to Supabase table:', dbErr);
       }
@@ -645,6 +661,7 @@ export function registerRouletteRoutes(app: express.Application, io: Server) {
         id: string;
         name: string;
         image_url?: string;
+        gift_class?: 'product' | 'money';
         probability: number;
         available_quantity?: number;
       }> = [];
@@ -655,6 +672,7 @@ export function registerRouletteRoutes(app: express.Application, io: Server) {
           id: g.id,
           name: g.name,
           image_url: g.image_url,
+          gift_class: g.gift_class || 'product',
           probability: g.probability,
           available_quantity: g.available_quantity
         });
@@ -746,6 +764,7 @@ export function registerRouletteRoutes(app: express.Application, io: Server) {
             gift_id: giftObj.id,
             gift_name_snapshot: giftObj.name,
             gift_image_snapshot: giftObj.image_url,
+            gift_class_snapshot: giftObj.gift_class || 'product',
             status: 'PENDING',
             won_at: new Date().toISOString(),
             delivered_at: null,
@@ -764,7 +783,7 @@ export function registerRouletteRoutes(app: express.Application, io: Server) {
               updated_at: new Date().toISOString()
             }).eq('id', giftObj.id);
 
-            await supabase.from('gift_winners').insert({
+            const insertPayload: any = {
               id: winnerRecord.id,
               unique_code: winnerRecord.unique_code,
               user_id: winnerRecord.user_id,
@@ -774,10 +793,17 @@ export function registerRouletteRoutes(app: express.Application, io: Server) {
               gift_id: winnerRecord.gift_id,
               gift_name_snapshot: winnerRecord.gift_name_snapshot,
               gift_image_snapshot: winnerRecord.gift_image_snapshot,
+              gift_class_snapshot: winnerRecord.gift_class_snapshot,
               status: winnerRecord.status,
               won_at: winnerRecord.won_at,
               created_at: winnerRecord.created_at
-            });
+            };
+
+            const { error: insErr } = await supabase.from('gift_winners').insert(insertPayload);
+            if (insErr && insErr.message?.includes('gift_class_snapshot')) {
+              delete insertPayload.gift_class_snapshot;
+              await supabase.from('gift_winners').insert(insertPayload);
+            }
           } catch (dbErr) {
             console.warn('Error syncing spin win to Supabase:', dbErr);
           }
@@ -834,7 +860,8 @@ export function registerRouletteRoutes(app: express.Application, io: Server) {
         gift: selectedSlice.type === 'gift' ? {
           id: selectedSlice.id,
           name: selectedSlice.name,
-          image_url: selectedSlice.image_url || ''
+          image_url: selectedSlice.image_url || '',
+          gift_class: (selectedSlice as any).gift_class || 'product'
         } : undefined,
         winner_record: winnerRecord,
         extra_attempt_granted: extraAttemptGranted,
@@ -966,5 +993,28 @@ export function registerRouletteRoutes(app: express.Application, io: Server) {
   app.get('/api/roulette/admin/audit-logs', (req, res) => {
     const store = loadStore();
     res.json(store.audit_logs.slice(0, 100));
+  });
+
+  // 15. POST /api/roulette/winner/contact-info
+  app.post('/api/roulette/winner/contact-info', async (req, res) => {
+    const unlock = await acquireLock();
+    try {
+      const { winnerId, user_phone, user_name, bank_account, bank_name } = req.body;
+      const store = loadStore();
+      const winner = store.winners.find(w => w.id === winnerId || w.unique_code === winnerId);
+      if (winner) {
+        if (user_phone !== undefined) winner.user_phone = user_phone;
+        if (user_name !== undefined) winner.user_name = user_name;
+        if (bank_account !== undefined) winner.bank_account = bank_account;
+        if (bank_name !== undefined) winner.bank_name = bank_name;
+        winner.updated_at = new Date().toISOString();
+        saveStore(store);
+      }
+      res.json({ success: true, winner });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    } finally {
+      unlock();
+    }
   });
 }

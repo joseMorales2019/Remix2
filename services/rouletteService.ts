@@ -7,6 +7,7 @@ export interface RouletteGift {
   description?: string;
   image_url: string;
   gift_type: 'product' | 'custom';
+  gift_class?: 'product' | 'money';
   initial_quantity: number;
   available_quantity: number;
   won_quantity: number;
@@ -73,6 +74,9 @@ export interface GiftWinner {
   gift_id: string;
   gift_name_snapshot: string;
   gift_image_snapshot: string;
+  gift_class_snapshot?: 'product' | 'money';
+  bank_account?: string;
+  bank_name?: string;
   status: 'PENDING' | 'DELIVERED'; // 'Pendiente de reclamar' | 'Entregado'
   won_at: string;
   delivered_at?: string | null;
@@ -104,6 +108,7 @@ export interface SpinResult {
     name: string;
     image_url: string;
     description?: string;
+    gift_class?: 'product' | 'money';
   };
   winner_record?: GiftWinner;
   extra_attempt_granted?: boolean;
@@ -170,6 +175,7 @@ const DEFAULT_GIFTS: RouletteGift[] = [
     description: 'Kit de cuidado y estilo exclusivo NewBank Store',
     image_url: 'https://stqthrzbvuqcavtsonba.supabase.co/storage/v1/object/public/NewBankImageProductos/product_1793726811854_0.webp',
     gift_type: 'product',
+    gift_class: 'product',
     initial_quantity: 15,
     available_quantity: 15,
     won_quantity: 0,
@@ -186,6 +192,7 @@ const DEFAULT_GIFTS: RouletteGift[] = [
     description: 'Audífonos inalámbricos de alta fidelidad con estuche de carga',
     image_url: 'https://m.media-amazon.com/images/I/61OS-Vh3NOL.jpg',
     gift_type: 'product',
+    gift_class: 'product',
     initial_quantity: 5,
     available_quantity: 5,
     won_quantity: 0,
@@ -202,6 +209,7 @@ const DEFAULT_GIFTS: RouletteGift[] = [
     description: 'Smartwatch multifuncional con monitoreo deportivo y llamadas',
     image_url: 'https://cdn.dotpe.in/longtail/store-items/7720394/d2ylpR50.webp',
     gift_type: 'product',
+    gift_class: 'product',
     initial_quantity: 3,
     available_quantity: 3,
     won_quantity: 0,
@@ -349,6 +357,7 @@ export const rouletteService = {
       description: gift.description || '',
       image_url: (gift.image_url && gift.image_url.trim()) ? gift.image_url.trim() : 'https://picsum.photos/seed/gift/400/400',
       gift_type: gift.gift_type || 'custom',
+      gift_class: gift.gift_class || 'product',
       initial_quantity: initialQty,
       available_quantity: availQty,
       won_quantity: gift.won_quantity || 0,
@@ -359,7 +368,19 @@ export const rouletteService = {
       updated_at: new Date().toISOString()
     };
 
-    const { data, error } = await supabase.from('gifts').upsert(payload).select().single();
+    let data: any = null;
+    let error: any = null;
+    const resWithClass = await supabase.from('gifts').upsert(payload).select().single();
+    if (resWithClass.error && (resWithClass.error.message?.includes('gift_class') || resWithClass.error.code === 'PGRST204')) {
+      const { gift_class, ...fallbackPayload } = payload;
+      const resFallback = await supabase.from('gifts').upsert(fallbackPayload).select().single();
+      data = resFallback.data;
+      error = resFallback.error;
+    } else {
+      data = resWithClass.data;
+      error = resWithClass.error;
+    }
+
     if (error) {
       console.error('Error upserting gift into Supabase:', error);
       throw new Error(`Error al guardar regalo en base de datos: ${error.message}`);
@@ -586,6 +607,7 @@ export const rouletteService = {
       id: string;
       name: string;
       image_url?: string;
+      gift_class?: 'product' | 'money';
       probability: number;
       available_quantity?: number;
     }> = [];
@@ -596,6 +618,7 @@ export const rouletteService = {
         id: g.id,
         name: g.name,
         image_url: g.image_url,
+        gift_class: g.gift_class || 'product',
         probability: g.probability,
         available_quantity: g.available_quantity
       });
@@ -714,6 +737,7 @@ export const rouletteService = {
             gift_id: giftObj.id,
             gift_name_snapshot: giftObj.name,
             gift_image_snapshot: giftObj.image_url,
+            gift_class_snapshot: giftObj.gift_class || 'product',
             status: 'PENDING',
             won_at: new Date().toISOString(),
             delivered_at: null,
@@ -722,7 +746,16 @@ export const rouletteService = {
             updated_at: new Date().toISOString()
           };
 
-          await supabase.from('gift_winners').insert(winnerRecord);
+          try {
+            await supabase.from('gift_winners').insert(winnerRecord);
+          } catch (insertErr: any) {
+            if (insertErr?.message?.includes('gift_class_snapshot')) {
+              const { gift_class_snapshot, ...fallbackWinner } = winnerRecord;
+              await supabase.from('gift_winners').insert(fallbackWinner);
+            } else {
+              console.warn('Error inserting winner record:', insertErr);
+            }
+          }
 
           nextAvailableAt = new Date(Date.now() + cooldownMinutes * 60 * 1000).toISOString();
           await supabase.from('user_roulette_status').upsert({
@@ -776,7 +809,8 @@ export const rouletteService = {
       gift: selectedSlice.type === 'gift' ? {
         id: selectedSlice.id,
         name: selectedSlice.name,
-        image_url: selectedSlice.image_url || ''
+        image_url: selectedSlice.image_url || '',
+        gift_class: (selectedSlice as any).gift_class || 'product'
       } : undefined,
       winner_record: winnerRecord,
       extra_attempt_granted: extraAttemptGranted,
@@ -989,6 +1023,52 @@ export const rouletteService = {
     }
 
     return newVisibility;
+  },
+
+  async updateWinnerContact(
+    winnerIdOrCode: string,
+    details: { user_phone?: string; user_name?: string; bank_account?: string; bank_name?: string }
+  ): Promise<void> {
+    try {
+      await fetch(`${API_BASE}/winner/contact-info`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ winnerId: winnerIdOrCode, ...details })
+      });
+    } catch {
+      // Backend optional fallback
+    }
+
+    try {
+      const updateData: any = {
+        updated_at: new Date().toISOString()
+      };
+      if (details.user_phone !== undefined) updateData.user_phone = details.user_phone;
+      if (details.user_name !== undefined) updateData.user_name = details.user_name;
+      if (details.bank_account !== undefined) updateData.bank_account = details.bank_account;
+      if (details.bank_name !== undefined) updateData.bank_name = details.bank_name;
+
+      let query = supabase.from('gift_winners').update(updateData);
+      if (winnerIdOrCode.startsWith('NBK-GIFT-')) {
+        query = query.eq('unique_code', winnerIdOrCode);
+      } else {
+        query = query.eq('id', winnerIdOrCode);
+      }
+
+      const { error } = await query;
+      if (error && (error.message?.includes('bank_account') || error.message?.includes('bank_name'))) {
+        const { bank_account, bank_name, ...baseData } = updateData;
+        let query2 = supabase.from('gift_winners').update(baseData);
+        if (winnerIdOrCode.startsWith('NBK-GIFT-')) {
+          query2 = query2.eq('unique_code', winnerIdOrCode);
+        } else {
+          query2 = query2.eq('id', winnerIdOrCode);
+        }
+        await query2;
+      }
+    } catch (err) {
+      console.warn('Error updating winner contact in Supabase:', err);
+    }
   },
 
   async toggleImpossibleMode(enabled: boolean, adminUser: any): Promise<RouletteSettings> {
