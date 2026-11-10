@@ -329,25 +329,6 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
           </div>
         ) : (
           <>
-            {/* Disclaimer when Impossible Mode is active */}
-            {settings?.impossible_mode && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-6 p-4 rounded-3xl bg-amber-500/10 border-2 border-amber-500/30 text-amber-900 flex items-start gap-3 shadow-sm"
-              >
-                <span className="text-2xl shrink-0">ℹ️</span>
-                <div className="text-xs">
-                  <h4 className="font-black uppercase tracking-wide text-amber-800">
-                    Modalidad Promocional de Exhibición Activa
-                  </h4>
-                  <p className="font-medium text-amber-900/80 mt-0.5">
-                    En esta sesión los productos se exhiben en la ruleta con fines de muestra. Las tiradas otorgarán oportunidades comodín especiales.
-                  </p>
-                </div>
-              </motion.div>
-            )}
-
             {/* TAB 1: RULETA INTERACTIVA */}
             {activeTab === 'wheel' && (
               <>
