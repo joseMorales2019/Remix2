@@ -77,6 +77,7 @@ export interface GiftWinner {
   won_at: string;
   delivered_at?: string | null;
   delivered_by?: string | null;
+  show_in_monthly_winners?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -902,6 +903,92 @@ export const rouletteService = {
     }
 
     return updatedWinner as GiftWinner;
+  },
+
+  async updateWinnerName(winnerId: string, fullName: string, adminUser: any): Promise<GiftWinner> {
+    const trimmed = fullName.trim();
+    const { data: updatedWinner, error } = await supabase
+      .from('gift_winners')
+      .update({
+        user_name: trimmed,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', winnerId)
+      .select()
+      .single();
+
+    if (error || !updatedWinner) {
+      throw new Error(`Error actualizando nombre en Supabase: ${error?.message || 'No encontrado'}`);
+    }
+
+    try {
+      await supabase.from('administrative_audit_logs').insert({
+        administrator_id: adminUser?.id || 'admin',
+        administrator_name: adminUser?.full_name || 'Administrador',
+        action: 'UPDATE_WINNER_NAME',
+        entity_type: 'WINNER_PRIZE',
+        entity_id: winnerId,
+        new_values: { user_name: trimmed },
+        created_at: new Date().toISOString()
+      });
+    } catch {
+      // Ignore audit err
+    }
+
+    return updatedWinner as GiftWinner;
+  },
+
+  async getMonthlyWinners(): Promise<GiftWinner[]> {
+    try {
+      const now = new Date();
+      // Start of current month in UTC
+      const startOfMonth = new Date(Date.UTC(now.getFullYear(), now.getMonth(), 1)).toISOString();
+
+      const { data, error } = await supabase
+        .from('gift_winners')
+        .select('*')
+        .gte('won_at', startOfMonth)
+        .order('won_at', { ascending: false });
+
+      if (!error && data) {
+        // Return only winners who are not hidden (show_in_monthly_winners !== false)
+        return (data as GiftWinner[]).filter(w => w.show_in_monthly_winners !== false);
+      }
+    } catch (e) {
+      console.warn('Error fetching monthly winners from Supabase:', e);
+    }
+    return [];
+  },
+
+  async toggleWinnerMonthlyVisibility(winnerId: string, currentVisibility: boolean, adminUser?: any): Promise<boolean> {
+    const newVisibility = !currentVisibility;
+    const { error } = await supabase
+      .from('gift_winners')
+      .update({
+        show_in_monthly_winners: newVisibility,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', winnerId);
+
+    if (error) {
+      throw new Error(`Error al actualizar visibilidad del ganador: ${error.message}`);
+    }
+
+    try {
+      await supabase.from('administrative_audit_logs').insert({
+        administrator_id: adminUser?.id || 'admin',
+        administrator_name: adminUser?.full_name || 'Administrador',
+        action: 'TOGGLE_MONTHLY_WINNER_VISIBILITY',
+        entity_type: 'WINNER_PRIZE',
+        entity_id: winnerId,
+        new_values: { show_in_monthly_winners: newVisibility },
+        created_at: new Date().toISOString()
+      });
+    } catch {
+      // Ignore audit logging error
+    }
+
+    return newVisibility;
   },
 
   async toggleImpossibleMode(enabled: boolean, adminUser: any): Promise<RouletteSettings> {

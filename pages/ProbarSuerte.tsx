@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { RouletteWheel, RouletteSlice } from '../components/RouletteWheel';
 import { RouletteResultModal } from '../components/RouletteResultModal';
+import { supabase } from '../supabase';
 import {
   rouletteService,
   RouletteSettings,
@@ -43,6 +44,7 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
   const [options, setOptions] = useState<RouletteOption[]>([]);
   const [userStatus, setUserStatus] = useState<UserRouletteStatus | null>(null);
   const [myPrizes, setMyPrizes] = useState<GiftWinner[]>([]);
+  const [monthlyWinners, setMonthlyWinners] = useState<GiftWinner[]>([]);
 
   // Spin State
   const [isSpinning, setIsSpinning] = useState<boolean>(false);
@@ -103,15 +105,17 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
   // Fetch initial data
   const fetchData = async () => {
     try {
-      const [fetchedSettings, fetchedGifts, fetchedOptions] = await Promise.all([
+      const [fetchedSettings, fetchedGifts, fetchedOptions, fetchedMonthlyWinners] = await Promise.all([
         rouletteService.getSettings(),
         rouletteService.getGifts(false),
-        rouletteService.getOptions()
+        rouletteService.getOptions(),
+        rouletteService.getMonthlyWinners()
       ]);
 
       setSettings(fetchedSettings);
       setGifts(fetchedGifts);
       setOptions(fetchedOptions);
+      setMonthlyWinners(fetchedMonthlyWinners);
 
       // Perform geo restriction validation
       checkUserGeolocation(fetchedSettings);
@@ -136,6 +140,18 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
 
   useEffect(() => {
     fetchData();
+
+    // Subscribe to realtime changes in gift_winners to keep monthly table updated
+    const channel = supabase
+      .channel('realtime_monthly_winners_ps')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'gift_winners' }, () => {
+        rouletteService.getMonthlyWinners().then((mw) => setMonthlyWinners(mw));
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [activeUserId]);
 
   // Live countdown timer tick
@@ -232,6 +248,7 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
       });
       rouletteService.getMyPrizes(activeUserId).then((p) => setMyPrizes(p));
     }
+    rouletteService.getMonthlyWinners().then((mw) => setMonthlyWinners(mw));
   };
 
   // Handle "Volver a Girar" for extra attempt wildcard
@@ -386,82 +403,181 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
 
                 {/* Normal Roulette Wheel if unrestricted or location allowed */}
                 {(!settings?.geo_restriction_enabled || geoCheckStatus === 'allowed') && (
-                  <div className="flex flex-col items-center">
-                {/* Status Bar */}
-                <div className="w-full max-w-md bg-white rounded-3xl p-4 mb-6 shadow-sm border border-slate-200/80 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg">
-                      {isExtraAttempt ? '⚡' : secondsLeft > 0 ? '⏳' : '✅'}
-                    </div>
-                    <div>
-                      <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider block">
-                        Estado de Participación
-                      </span>
-                      <p className="text-xs font-black uppercase text-slate-800">
-                        {isExtraAttempt
-                          ? '¡Intento Extra Disponible!'
-                          : secondsLeft > 0
-                          ? `En espera: ${formatCountdown(secondsLeft)}`
-                          : '¡Listo para girar!'}
-                      </p>
+                  <div className="w-full max-w-6xl mx-auto">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                      {/* Left: Roulette Wheel & Controls */}
+                      <div className="lg:col-span-7 xl:col-span-8 flex flex-col items-center">
+                        {/* Status Bar */}
+                        <div className="w-full max-w-md bg-white rounded-3xl p-4 mb-6 shadow-sm border border-slate-200/80 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold text-lg">
+                              {isExtraAttempt ? '⚡' : secondsLeft > 0 ? '⏳' : '✅'}
+                            </div>
+                            <div>
+                              <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider block">
+                                Estado de Participación
+                              </span>
+                              <p className="text-xs font-black uppercase text-slate-800">
+                                {isExtraAttempt
+                                  ? '¡Intento Extra Disponible!'
+                                  : secondsLeft > 0
+                                  ? `En espera: ${formatCountdown(secondsLeft)}`
+                                  : '¡Listo para girar!'}
+                              </p>
+                            </div>
+                          </div>
+
+                          {secondsLeft > 0 && !isExtraAttempt && (
+                            <div className="bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl text-center">
+                              <span className="text-[9px] font-bold text-amber-600 uppercase block">Próximo giro en</span>
+                              <span className="text-xs font-black font-mono text-amber-800">{formatCountdown(secondsLeft)}</span>
+                            </div>
+                          )}
+
+                          {isExtraAttempt && (
+                            <span className="px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-black uppercase animate-pulse">
+                              Giro Gratis
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Roulette Wheel Component */}
+                        <div className="w-full flex justify-center my-2">
+                          <RouletteWheel
+                            slices={wheelSlices}
+                            isSpinning={isSpinning}
+                            targetIndex={targetIndex}
+                            onSpinEnd={handleSpinEnd}
+                            onSpinClick={handleSpinClick}
+                            disabled={
+                              isSpinning ||
+                              !settings?.is_active ||
+                              (secondsLeft > 0 && !isExtraAttempt)
+                            }
+                            buttonLabel={
+                              isSpinning
+                                ? 'SUERTE...'
+                                : isExtraAttempt
+                                ? 'GIRAR ⚡'
+                                : secondsLeft > 0
+                                ? formatCountdown(secondsLeft)
+                                : 'GIRAR'
+                            }
+                          />
+                        </div>
+
+                        {/* Quick Hint */}
+                        <p className="text-[11px] font-bold text-slate-500 mt-1 mb-2 flex items-center justify-center gap-1.5 select-none text-center">
+                          <span>💡</span> Toca cualquier premio en la ruleta para ver su imagen y nombre completo
+                        </p>
+
+                        {/* Bottom Guide info card */}
+                        <div className="w-full max-w-xl mt-6 p-5 rounded-3xl bg-white border border-slate-200/80 shadow-sm text-center space-y-2">
+                          <h3 className="text-xs font-black uppercase text-slate-900 tracking-wider">
+                            ¿Cómo funciona la ruleta de NewBank?
+                          </h3>
+                          <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                            Presiona el botón central para girar. Si ganas un regalo recibirás un código único para reclamarlo directamente con el propietario. Si obtienes un comodín podrás ganar un tiro adicional o probar tu suerte nuevamente en 1 hora.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Right: Tabla de Ganadores del Mes */}
+                      <div className="lg:col-span-5 xl:col-span-4 w-full">
+                        <div className="bg-white rounded-[2rem] border border-slate-200/80 shadow-sm p-5 sm:p-6 space-y-4 sticky top-6">
+                          {/* Header */}
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 via-amber-400 to-yellow-300 text-slate-900 flex items-center justify-center text-2xl shadow-md shadow-amber-200">
+                                🏆
+                              </div>
+                              <div>
+                                <h3 className="text-sm font-black uppercase text-slate-900 tracking-tight">
+                                  Ganadores del Mes
+                                </h3>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                                  {new Date().toLocaleDateString('es-SV', { month: 'long', year: 'numeric' })}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[10px] font-black uppercase">
+                              {monthlyWinners.length} {monthlyWinners.length === 1 ? 'Ganador' : 'Ganadores'}
+                            </span>
+                          </div>
+
+                          <p className="text-xs text-slate-500 font-medium leading-relaxed">
+                            Usuarios afortunados que han ganado un premio en la ruleta rusa de NewBank durante este mes:
+                          </p>
+
+                          {/* Table / List of Monthly Winners */}
+                          {monthlyWinners.length === 0 ? (
+                            <div className="py-12 text-center space-y-3 bg-slate-50/70 rounded-2xl p-4 border border-slate-100">
+                              <div className="text-4xl">🎁</div>
+                              <div>
+                                <p className="text-xs font-black text-slate-700 uppercase">
+                                  Sé el primer ganador del mes
+                                </p>
+                                <p className="text-[11px] text-slate-400 font-medium mt-1">
+                                  ¡Gira la ruleta y tu nombre aparecerá registrado aquí!
+                                </p>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-2.5 max-h-[520px] overflow-y-auto pr-1">
+                              {monthlyWinners.map((w, idx) => {
+                                const wonDate = new Date(w.won_at).toLocaleDateString('es-SV', {
+                                  day: 'numeric',
+                                  month: 'short'
+                                });
+                                return (
+                                  <div
+                                    key={w.id || idx}
+                                    className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-slate-50/80 hover:bg-slate-100/90 transition border border-slate-100/90 shadow-2xs"
+                                  >
+                                    <div className="flex items-center gap-3 min-w-0">
+                                      <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center font-black text-xs text-slate-700 shrink-0 shadow-2xs">
+                                        {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
+                                      </div>
+                                      {w.gift_image_snapshot ? (
+                                        <img
+                                          src={w.gift_image_snapshot}
+                                          alt={w.gift_name_snapshot}
+                                          className="w-9 h-9 rounded-xl object-cover border border-slate-100 shrink-0"
+                                        />
+                                      ) : (
+                                        <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center text-sm shrink-0">
+                                          🎁
+                                        </div>
+                                      )}
+                                      <div className="min-w-0">
+                                        <p className="text-xs font-black text-slate-900 truncate">
+                                          {w.user_name || 'Usuario Ganador'}
+                                        </p>
+                                        <p className="text-[10px] font-bold text-blue-600 truncate">
+                                          {w.gift_name_snapshot}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <span className="text-[10px] font-bold text-slate-400 shrink-0 uppercase tracking-wider">
+                                      {wonDate}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {/* Footer note */}
+                          <div className="pt-2 border-t border-slate-100 text-center">
+                            <span className="text-[10px] text-slate-400 font-medium">
+                              Actualizado en tiempo real • ¡Todos tienen oportunidad de ganar!
+                            </span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
-
-                  {secondsLeft > 0 && !isExtraAttempt && (
-                    <div className="bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-xl text-center">
-                      <span className="text-[9px] font-bold text-amber-600 uppercase block">Próximo giro en</span>
-                      <span className="text-xs font-black font-mono text-amber-800">{formatCountdown(secondsLeft)}</span>
-                    </div>
-                  )}
-
-                  {isExtraAttempt && (
-                    <span className="px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-[10px] font-black uppercase animate-pulse">
-                      Giro Gratis
-                    </span>
-                  )}
-                </div>
-
-                {/* Roulette Wheel Component */}
-                <div className="w-full flex justify-center my-2">
-                  <RouletteWheel
-                    slices={wheelSlices}
-                    isSpinning={isSpinning}
-                    targetIndex={targetIndex}
-                    onSpinEnd={handleSpinEnd}
-                    onSpinClick={handleSpinClick}
-                    disabled={
-                      isSpinning ||
-                      !settings?.is_active ||
-                      (secondsLeft > 0 && !isExtraAttempt)
-                    }
-                    buttonLabel={
-                      isSpinning
-                        ? 'SUERTE...'
-                        : isExtraAttempt
-                        ? 'GIRAR ⚡'
-                        : secondsLeft > 0
-                        ? formatCountdown(secondsLeft)
-                        : 'GIRAR'
-                    }
-                  />
-                </div>
-
-                {/* Quick Hint */}
-                <p className="text-[11px] font-bold text-slate-500 mt-1 mb-2 flex items-center justify-center gap-1.5 select-none text-center">
-                  <span>💡</span> Toca cualquier premio en la ruleta para ver su imagen y nombre completo
-                </p>
-
-                {/* Bottom Guide info card */}
-                <div className="w-full max-w-xl mt-6 p-5 rounded-3xl bg-white border border-slate-200/80 shadow-sm text-center space-y-2">
-                  <h3 className="text-xs font-black uppercase text-slate-900 tracking-wider">
-                    ¿Cómo funciona la ruleta de NewBank?
-                  </h3>
-                  <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                    Presiona el botón central para girar. Si ganas un regalo recibirás un código único para reclamarlo directamente con el propietario. Si obtienes un comodín podrás ganar un tiro adicional o probar tu suerte nuevamente en 1 hora.
-                  </p>
-                </div>
-              </div>
-            )}
+                )}
           </>
         )}
 

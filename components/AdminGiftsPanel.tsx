@@ -31,6 +31,8 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
   // Search and filter for winners
   const [winnerSearch, setWinnerSearch] = useState('');
   const [winnerStatusFilter, setWinnerStatusFilter] = useState<'ALL' | 'PENDING' | 'DELIVERED'>('ALL');
+  const [editingWinnerNames, setEditingWinnerNames] = useState<Record<string, string>>({});
+  const [savedWinnerId, setSavedWinnerId] = useState<string | null>(null);
 
   // Search and filter for catalog products
   const [catalogSearch, setCatalogSearch] = useState('');
@@ -635,14 +637,57 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
     }
   };
 
+  // Save Winner Name and Surname
+  const handleSaveWinnerName = async (winnerId: string) => {
+    const newName = (editingWinnerNames[winnerId] !== undefined ? editingWinnerNames[winnerId] : '').trim();
+    if (!newName) {
+      alert('Por favor ingresa un nombre y un apellido válido.');
+      return;
+    }
+
+    setActionLoading('saving-winner-name-' + winnerId);
+    try {
+      await rouletteService.updateWinnerName(winnerId, newName, user);
+      setWinners(prev => prev.map(w => w.id === winnerId ? { ...w, user_name: newName } : w));
+      setSavedWinnerId(winnerId);
+      setTimeout(() => {
+        setSavedWinnerId(null);
+      }, 2500);
+    } catch (err: any) {
+      alert('Error guardando nombre y apellido: ' + err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Toggle visibility in monthly winners table
+  const handleToggleMonthlyVisibility = async (winner: GiftWinner) => {
+    const isCurrentlyVisible = winner.show_in_monthly_winners !== false;
+    setActionLoading('toggling-visibility-' + winner.id);
+    try {
+      const newVisibility = await rouletteService.toggleWinnerMonthlyVisibility(winner.id, isCurrentlyVisible, user);
+      setWinners(prev => prev.map(w => w.id === winner.id ? { ...w, show_in_monthly_winners: newVisibility } : w));
+    } catch (err: any) {
+      alert('Error cambiando visibilidad: ' + err.message);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   // Mark Prize as Delivered
   const handleMarkAsDelivered = async (winner: GiftWinner) => {
-    if (!confirm(`¿Confirmas que el premio "${winner.gift_name_snapshot}" (Código: ${winner.unique_code}) fue entregado al usuario ${winner.user_name}?`)) {
+    const pendingName = editingWinnerNames[winner.id]?.trim();
+    const currentName = pendingName || winner.user_name || 'Usuario Ganador';
+
+    if (!confirm(`¿Confirmas que el premio "${winner.gift_name_snapshot}" (Código: ${winner.unique_code}) fue entregado al usuario ${currentName}?`)) {
       return;
     }
 
     setActionLoading('delivering-' + winner.id);
     try {
+      if (pendingName && pendingName !== winner.user_name) {
+        await rouletteService.updateWinnerName(winner.id, pendingName, user);
+      }
       await rouletteService.markAsDelivered(winner.id, user);
       alert('¡Premio marcado como ENTREGADO! La cuenta del usuario se ha actualizado automáticamente.');
       fetchData();
@@ -655,11 +700,13 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
 
   // Filter winners
   const filteredWinners = winners.filter((w) => {
+    const searchLower = winnerSearch.toLowerCase();
     const matchesSearch =
-      w.user_name?.toLowerCase().includes(winnerSearch.toLowerCase()) ||
-      w.user_email?.toLowerCase().includes(winnerSearch.toLowerCase()) ||
-      w.unique_code?.toLowerCase().includes(winnerSearch.toLowerCase()) ||
-      w.gift_name_snapshot?.toLowerCase().includes(winnerSearch.toLowerCase());
+      w.user_name?.toLowerCase().includes(searchLower) ||
+      w.user_email?.toLowerCase().includes(searchLower) ||
+      w.user_phone?.toLowerCase().includes(searchLower) ||
+      w.unique_code?.toLowerCase().includes(searchLower) ||
+      w.gift_name_snapshot?.toLowerCase().includes(searchLower);
 
     const matchesStatus =
       winnerStatusFilter === 'ALL'
@@ -1165,7 +1212,7 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
                     type="text"
                     value={winnerSearch}
                     onChange={(e) => setWinnerSearch(e.target.value)}
-                    placeholder="Buscar código o usuario..."
+                    placeholder="Buscar código, nombre, apellido o contacto..."
                     className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold flex-grow sm:flex-initial"
                   />
                   <select
@@ -1187,11 +1234,12 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
                     <thead>
                       <tr className="bg-slate-50 text-[10px] font-black uppercase text-slate-400 tracking-widest border-b border-slate-100">
                         <th className="px-6 py-4">Código Único</th>
-                        <th className="px-6 py-4">Usuario</th>
+                        <th className="px-6 py-4">Usuario (Nombre y Apellido)</th>
                         <th className="px-6 py-4">Premio Ganado</th>
                         <th className="px-6 py-4">Fecha y Hora</th>
                         <th className="px-6 py-4 text-center">Estado</th>
                         <th className="px-6 py-4">Entrega</th>
+                        <th className="px-6 py-4 text-center">Tabla del Mes</th>
                         <th className="px-6 py-4 text-right">Acción</th>
                       </tr>
                     </thead>
@@ -1201,9 +1249,52 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
                           <td className="px-6 py-4 font-mono font-black text-blue-600">
                             {winner.unique_code}
                           </td>
-                          <td className="px-6 py-4">
-                            <p className="font-bold text-slate-900">{winner.user_name}</p>
-                            <p className="text-[10px] text-slate-400">{winner.user_email || winner.user_phone || 'Sin contacto'}</p>
+                          <td className="px-6 py-4 min-w-[240px]">
+                            <div className="space-y-1.5">
+                              <div>
+                                <label className="text-[9px] font-black uppercase text-slate-400 tracking-wider block mb-1">
+                                  👤 Nombre y Apellido:
+                                </label>
+                                <div className="flex items-center gap-1.5">
+                                  <input
+                                    type="text"
+                                    value={
+                                      editingWinnerNames[winner.id] !== undefined
+                                        ? editingWinnerNames[winner.id]
+                                        : (winner.user_name || '')
+                                    }
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setEditingWinnerNames(prev => ({ ...prev, [winner.id]: val }));
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        handleSaveWinnerName(winner.id);
+                                      }
+                                    }}
+                                    placeholder="Nombre y apellido del ganador..."
+                                    className="px-2.5 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-white focus:bg-white focus:border-blue-500 text-xs font-bold text-slate-900 placeholder:text-slate-400 transition shadow-inner w-full"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSaveWinnerName(winner.id)}
+                                    disabled={actionLoading === 'saving-winner-name-' + winner.id}
+                                    title="Guardar nombre y apellido"
+                                    className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition shrink-0 cursor-pointer ${
+                                      savedWinnerId === winner.id
+                                        ? 'bg-emerald-600 text-white'
+                                        : 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm'
+                                    }`}
+                                  >
+                                    {actionLoading === 'saving-winner-name-' + winner.id ? '...' : savedWinnerId === winner.id ? '✓' : 'Guardar'}
+                                  </button>
+                                </div>
+                              </div>
+                              <p className="text-[10px] text-slate-400 font-medium truncate">
+                                {winner.user_phone ? `📱 ${winner.user_phone}` : winner.user_email ? `✉️ ${winner.user_email}` : 'Sin contacto'}
+                              </p>
+                            </div>
                           </td>
                           <td className="px-6 py-4 flex items-center gap-2">
                             {winner.gift_image_snapshot && (
@@ -1241,6 +1332,22 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
                               <span className="text-slate-300 italic">No entregado</span>
                             )}
                           </td>
+                          <td className="px-6 py-4 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleMonthlyVisibility(winner)}
+                              disabled={actionLoading === 'toggling-visibility-' + winner.id}
+                              className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition inline-flex items-center gap-1.5 shadow-sm cursor-pointer ${
+                                winner.show_in_monthly_winners !== false
+                                  ? 'bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100'
+                                  : 'bg-slate-100 text-slate-500 border border-slate-200 hover:bg-slate-200'
+                              }`}
+                              title={winner.show_in_monthly_winners !== false ? 'Visible en tabla del mes. Haz clic para ocultar.' : 'Oculto en tabla del mes. Haz clic para mostrar.'}
+                            >
+                              <span>{winner.show_in_monthly_winners !== false ? '👁️' : '🙈'}</span>
+                              <span>{actionLoading === 'toggling-visibility-' + winner.id ? '...' : winner.show_in_monthly_winners !== false ? 'Visible' : 'Oculto'}</span>
+                            </button>
+                          </td>
                           <td className="px-6 py-4 text-right">
                             {winner.status === 'PENDING' ? (
                               <button
@@ -1258,7 +1365,7 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
                       ))}
                       {filteredWinners.length === 0 && (
                         <tr>
-                          <td colSpan={7} className="py-12 text-center text-slate-400 font-bold uppercase text-xs">
+                          <td colSpan={8} className="py-12 text-center text-slate-400 font-bold uppercase text-xs">
                             No se encontraron registros con los filtros seleccionados.
                           </td>
                         </tr>
