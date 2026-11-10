@@ -512,11 +512,11 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
                             <div className="w-full flex flex-col items-center justify-center pt-1">
                               <div
                                 className="wompi_button_widget flex items-center justify-center w-full min-h-[48px]"
-                                data-url-pago="https://pagos.wompi.sv/IntentoPago/Redirect?id=f292f55a-5a34-4387-bea9-3e5a32effcac&esWidget=1"
+                                data-url-pago="https://pagos.wompi.sv/IntentoPago/Redirect?id=60d8bc69-eb98-4e31-a40e-cb003df29380&esWidget=1"
                                 data-render="widget"
                               >
                                 <a
-                                  href="https://pagos.wompi.sv/IntentoPago/Redirect?id=f292f55a-5a34-4387-bea9-3e5a32effcac&esWidget=1"
+                                  href="https://pagos.wompi.sv/IntentoPago/Redirect?id=60d8bc69-eb98-4e31-a40e-cb003df29380&esWidget=1"
                                   target="_blank"
                                   rel="noopener noreferrer"
                                   className="w-full max-w-xs py-3.5 px-6 bg-[#592c82] hover:bg-[#4a246d] text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg transition flex items-center justify-center gap-2 cursor-pointer"

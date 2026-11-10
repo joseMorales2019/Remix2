@@ -77,8 +77,8 @@ serve(async (req) => {
     // 2. Procesar transacciones aprobadas
     if (ResultadoTransaccion === 'ExitosaAprobada') {
 
-      // CASO A: Pago de ruleta para volver a intentar (IdIntentoPago: f292f55a-5a34-4387-bea9-3e5a32effcac)
-      if (IdIntentoPago === 'f292f55a-5a34-4387-bea9-3e5a32effcac') {
+      // CASO A: Pago de ruleta para volver a intentar (IdIntentoPago: f292f55a-5a34-4387-bea9-3e5a32effcac o 60d8bc69-eb98-4e31-a40e-cb003df29380)
+      if (IdIntentoPago === 'f292f55a-5a34-4387-bea9-3e5a32effcac' || IdIntentoPago === '60d8bc69-eb98-4e31-a40e-cb003df29380') {
         let targetProfiles: any[] = [];
 
         if (userEmail) {
