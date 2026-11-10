@@ -532,29 +532,15 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
                                 return (
                                   <div
                                     key={w.id || idx}
-                                    className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-slate-50/80 hover:bg-slate-100/90 transition border border-slate-100/90 shadow-2xs"
+                                    className="flex items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-50/80 hover:bg-slate-100/90 transition border border-slate-100/90 shadow-2xs"
                                   >
                                     <div className="flex items-center gap-3 min-w-0">
                                       <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center font-black text-xs text-slate-700 shrink-0 shadow-2xs">
                                         {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`}
                                       </div>
-                                      {w.gift_image_snapshot ? (
-                                        <img
-                                          src={w.gift_image_snapshot}
-                                          alt={w.gift_name_snapshot}
-                                          className="w-9 h-9 rounded-xl object-cover border border-slate-100 shrink-0"
-                                        />
-                                      ) : (
-                                        <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center text-sm shrink-0">
-                                          🎁
-                                        </div>
-                                      )}
                                       <div className="min-w-0">
                                         <p className="text-xs font-black text-slate-900 truncate">
                                           {w.user_name || 'Usuario Ganador'}
-                                        </p>
-                                        <p className="text-[10px] font-bold text-blue-600 truncate">
-                                          {w.gift_name_snapshot}
                                         </p>
                                       </div>
                                     </div>
