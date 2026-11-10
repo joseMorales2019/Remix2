@@ -147,10 +147,31 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'gift_winners' }, () => {
         rouletteService.getMonthlyWinners().then((mw) => setMonthlyWinners(mw));
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_roulette_status' }, () => {
+        if (activeUserId) {
+          rouletteService.getUserStatus(activeUserId).then((st) => {
+            setUserStatus(st);
+            setIsExtraAttempt(st.extra_attempt_available);
+            setSecondsLeft(st.remaining_seconds || 0);
+          });
+        }
+      })
       .subscribe();
+
+    const handleFocus = () => {
+      if (activeUserId) {
+        rouletteService.getUserStatus(activeUserId).then((st) => {
+          setUserStatus(st);
+          setIsExtraAttempt(st.extra_attempt_available);
+          setSecondsLeft(st.remaining_seconds || 0);
+        });
+      }
+    };
+    window.addEventListener('focus', handleFocus);
 
     return () => {
       supabase.removeChannel(channel);
+      window.removeEventListener('focus', handleFocus);
     };
   }, [activeUserId]);
 
@@ -186,6 +207,30 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
     const secs = totalSec % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
+
+  // Determinar si la ruleta está bloqueada por tiempo de espera
+  const isRouletteBlocked = Boolean(!isSpinning && ((secondsLeft > 0 || userStatus?.is_in_cooldown) && !isExtraAttempt));
+
+  // Inyección dinámica del script oficial de Wompi cuando la ruleta está bloqueada
+  useEffect(() => {
+    if (isRouletteBlocked) {
+      const scriptId = 'wompi-roulette-blocked-script';
+      const existing = document.getElementById(scriptId);
+      if (existing) {
+        existing.remove();
+      }
+      const script = document.createElement('script');
+      script.id = scriptId;
+      script.src = 'https://pagos.wompi.sv/js/wompi.pagos.js';
+      script.async = true;
+      document.body.appendChild(script);
+
+      return () => {
+        const s = document.getElementById(scriptId);
+        if (s) s.remove();
+      };
+    }
+  }, [isRouletteBlocked]);
 
   // Build the wheel slices dynamically
   const wheelSlices: RouletteSlice[] = [];
@@ -451,6 +496,37 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
                         <p className="text-[11px] font-bold text-slate-500 mt-1 mb-2 flex items-center justify-center gap-1.5 select-none text-center">
                           <span>💡</span> Toca cualquier premio en la ruleta para ver su imagen y nombre completo
                         </p>
+
+                        {/* Botón de pago cuando la ruleta está bloqueada */}
+                        {isRouletteBlocked && (
+                          <div className="w-full max-w-xl my-4 p-5 rounded-3xl bg-gradient-to-r from-purple-50 via-indigo-50 to-blue-50 border-2 border-purple-200 shadow-md text-center flex flex-col items-center gap-3">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xl">⏳</span>
+                              <h4 className="text-xs sm:text-sm font-black uppercase text-purple-950 tracking-wide">
+                                Ruleta bloqueada en tiempo de espera ({formatCountdown(secondsLeft)})
+                              </h4>
+                            </div>
+                            <p className="text-xs font-bold text-slate-600 max-w-md">
+                              ¿No quieres esperar? Compra una oportunidad más para desbloquear la ruleta rusa y probar tu suerte de inmediato.
+                            </p>
+                            <div className="w-full flex flex-col items-center justify-center pt-1">
+                              <div
+                                className="wompi_button_widget flex items-center justify-center w-full min-h-[48px]"
+                                data-url-pago="https://pagos.wompi.sv/IntentoPago/Redirect?id=f292f55a-5a34-4387-bea9-3e5a32effcac&esWidget=1"
+                                data-render="widget"
+                              >
+                                <a
+                                  href="https://pagos.wompi.sv/IntentoPago/Redirect?id=f292f55a-5a34-4387-bea9-3e5a32effcac&esWidget=1"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="w-full max-w-xs py-3.5 px-6 bg-[#592c82] hover:bg-[#4a246d] text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg transition flex items-center justify-center gap-2 cursor-pointer"
+                                >
+                                  <span>💳</span> Comprar una oportunidad más
+                                </a>
+                              </div>
+                            </div>
+                          </div>
+                        )}
 
                         {/* Bottom Guide info card */}
                         <div className="w-full max-w-xl mt-6 p-5 rounded-3xl bg-white border border-slate-200/80 shadow-sm text-center space-y-2">

@@ -564,6 +564,9 @@ export const RouletteResultModal: React.FC<RouletteResultModalProps> = ({
 
               {/* Botón de pago Wompi solicitado para reactivar la suerte */}
               <div className="w-full flex flex-col items-center justify-center pt-1">
+                <p className="text-base sm:text-lg font-black uppercase text-slate-900 tracking-tight mb-2 text-center">
+                  Comprar un giro por $1
+                </p>
                 <div 
                   className="wompi_button_widget flex items-center justify-center w-full min-h-[48px]" 
                   data-url-pago="https://pagos.wompi.sv/IntentoPago/Redirect?id=f292f55a-5a34-4387-bea9-3e5a32effcac&esWidget=1" 
@@ -575,7 +578,7 @@ export const RouletteResultModal: React.FC<RouletteResultModalProps> = ({
                     rel="noopener noreferrer"
                     className="w-full py-3.5 px-6 bg-[#592c82] hover:bg-[#4a246d] text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg transition flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <span>💳</span> Pagar con Wompi
+                    <span>💳</span> comprar mas giros ya
                   </a>
                 </div>
               </div>
