@@ -446,6 +446,11 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
                   />
                 </div>
 
+                {/* Quick Hint */}
+                <p className="text-[11px] font-bold text-slate-500 mt-1 mb-2 flex items-center justify-center gap-1.5 select-none text-center">
+                  <span>💡</span> Toca cualquier premio en la ruleta para ver su imagen y nombre completo
+                </p>
+
                 {/* Bottom Guide info card */}
                 <div className="w-full max-w-xl mt-6 p-5 rounded-3xl bg-white border border-slate-200/80 shadow-sm text-center space-y-2">
                   <h3 className="text-xs font-black uppercase text-slate-900 tracking-wider">
@@ -536,7 +541,7 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
 
                             <div className="space-y-1 flex-grow min-w-0">
                               <div className="flex justify-between items-start gap-2">
-                                <h4 className="font-black text-sm text-slate-900 truncate">
+                                <h4 className="font-black text-sm text-slate-900 leading-snug break-words">
                                   {prize.gift_name_snapshot}
                                 </h4>
                                 <span

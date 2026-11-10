@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 
 export interface RouletteSlice {
   id: string;
@@ -16,6 +17,7 @@ interface RouletteWheelProps {
   onSpinClick: () => void;
   disabled?: boolean;
   buttonLabel?: string;
+  onSelectSlice?: (slice: RouletteSlice) => void;
 }
 
 // Slice color palettes designed for high contrast, elegance, and visual separation
@@ -31,49 +33,48 @@ const SLICE_COLORS_GIFTS = [
 const SLICE_COLOR_EXTRA = { bg: '#4f46e5', text: '#ffffff', border: '#4338ca' }; // Indigo
 const SLICE_COLOR_NO_PRIZE = { bg: '#475569', text: '#ffffff', border: '#334155' }; // Slate
 
-// Format and cleanly split slice text into 1 or 2 readable lines
-function formatSliceText(
+// Format and cleanly split slice text into readable lines WITHOUT truncating words or adding cut-off ellipses
+function formatSliceLines(
   name: string,
   type: 'gift' | 'extra_attempt' | 'no_prize'
-): { line1: string; line2?: string } {
+): string[] {
   if (type === 'extra_attempt') {
-    return { line1: '+1 INTENTO', line2: '¡GIRA GRATIS!' };
+    return ['+1 INTENTO', '¡GIRA GRATIS!'];
   }
   if (type === 'no_prize') {
-    return { line1: 'GRACIAS', line2: 'Por participar' };
+    return ['GRACIAS', 'POR PARTICIPAR'];
   }
 
-  // Clean raw product name
+  // Clean raw product name (strip leading emoji if present)
   const cleanName = name.replace(/^🎁\s*/, '').trim();
 
-  // If short enough (12 chars or fewer), fit into a single bold line
-  if (cleanName.length <= 12) {
-    return { line1: cleanName.toUpperCase() };
+  // If short (11 chars or fewer), fit comfortably into a single line
+  if (cleanName.length <= 11) {
+    return [cleanName.toUpperCase()];
   }
 
-  const words = cleanName.split(' ');
-  if (words.length === 1) {
-    return { line1: cleanName.slice(0, 13).toUpperCase() + (cleanName.length > 13 ? '…' : '') };
+  const words = cleanName.split(/\s+/).filter(Boolean);
+  if (words.length <= 1) {
+    return [cleanName.toUpperCase()];
   }
 
-  // Find the most balanced split point between words
-  let bestLine1 = words[0];
-  let bestLine2 = words.slice(1).join(' ');
+  if (words.length === 2) {
+    return [words[0].toUpperCase(), words[1].toUpperCase()];
+  }
 
-  for (let i = 1; i < words.length; i++) {
-    const l1 = words.slice(0, i).join(' ');
-    const l2 = words.slice(i).join(' ');
-    if (Math.abs(l1.length - l2.length) < Math.abs(bestLine1.length - bestLine2.length)) {
-      bestLine1 = l1;
-      bestLine2 = l2;
+  if (words.length === 3) {
+    // If the first two words are relatively short, pair them
+    if (words[0].length + words[1].length <= 14) {
+      return [`${words[0]} ${words[1]}`.toUpperCase(), words[2].toUpperCase()];
     }
+    return [words[0].toUpperCase(), `${words[1]} ${words[2]}`.toUpperCase()];
   }
 
-  // Limit line lengths
-  if (bestLine1.length > 14) bestLine1 = bestLine1.slice(0, 13) + '…';
-  if (bestLine2.length > 14) bestLine2 = bestLine2.slice(0, 13) + '…';
-
-  return { line1: bestLine1.toUpperCase(), line2: bestLine2.toUpperCase() };
+  // 4 or more words: balance across 2 lines without cutting any word
+  const mid = Math.ceil(words.length / 2);
+  const line1 = words.slice(0, mid).join(' ');
+  const line2 = words.slice(mid).join(' ');
+  return [line1.toUpperCase(), line2.toUpperCase()];
 }
 
 export const RouletteWheel: React.FC<RouletteWheelProps> = ({
@@ -83,13 +84,16 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
   onSpinEnd,
   onSpinClick,
   disabled = false,
-  buttonLabel = 'GIRAR'
+  buttonLabel = 'GIRAR',
+  onSelectSlice
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const currentRotationRef = useRef<number>(0);
   const animFrameRef = useRef<number | null>(null);
   const imagesCacheRef = useRef<Map<string, HTMLImageElement>>(new Map());
   const [imagesLoaded, setImagesLoaded] = useState(0);
+  const [selectedPrize, setSelectedPrize] = useState<RouletteSlice | null>(null);
+  const [isHoveringSlice, setIsHoveringSlice] = useState<boolean>(false);
 
   // Preload slice images with CORS handling and fallback for crisp canvas rendering
   useEffect(() => {
@@ -219,35 +223,61 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
       ctx.rotate(midAngle);
 
       // ==========================================
-      // 1. TEXT RENDERING (Maximized legibility)
+      // 1. TEXT RENDERING (Complete, legible, auto-fitted)
       // ==========================================
-      const { line1, line2 } = formatSliceText(slice.name, slice.type);
+      const lines = formatSliceLines(slice.name, slice.type);
 
       ctx.save();
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.font = `800 ${fontSize}px Inter, -apple-system, sans-serif`;
+
+      // Maximum radial distance allowed for text between inner hub and outer badge disc
+      const maxAllowedWidth = Math.max(85, (badgeX - badgeRadius) - 105);
+
+      // Dynamically fit font size so the name is never cut off
+      let optimalFontSize = fontSize;
+      ctx.font = `800 ${optimalFontSize}px Inter, -apple-system, sans-serif`;
+      let maxLineWidth = 0;
+      for (const line of lines) {
+        const w = ctx.measureText(line).width;
+        if (w > maxLineWidth) maxLineWidth = w;
+      }
+
+      if (maxLineWidth > maxAllowedWidth && maxLineWidth > 0) {
+        const scale = maxAllowedWidth / maxLineWidth;
+        optimalFontSize = Math.max(9.5, Math.floor(optimalFontSize * scale));
+      }
+
+      ctx.font = `800 ${optimalFontSize}px Inter, -apple-system, sans-serif`;
 
       // Text stroke outline for 100% contrast on any color
       ctx.lineWidth = 3.5;
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.65)';
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
       ctx.shadowColor = 'rgba(0, 0, 0, 0.85)';
       ctx.shadowBlur = 6;
       ctx.fillStyle = '#ffffff';
 
-      if (line2) {
-        // Double-line layout
-        ctx.strokeText(line1, textCenterX, -11);
-        ctx.fillText(line1, textCenterX, -11);
+      if (lines.length === 1) {
+        ctx.strokeText(lines[0], textCenterX, 0);
+        ctx.fillText(lines[0], textCenterX, 0);
+      } else if (lines.length === 2) {
+        const spacing = Math.max(9.5, optimalFontSize * 0.95);
+        ctx.strokeText(lines[0], textCenterX, -spacing);
+        ctx.fillText(lines[0], textCenterX, -spacing);
 
-        ctx.font = `700 ${Math.max(11, fontSize - 2)}px Inter, -apple-system, sans-serif`;
-        ctx.strokeText(line2, textCenterX, 11);
-        ctx.fillText(line2, textCenterX, 11);
+        ctx.font = `700 ${Math.max(9, optimalFontSize - 1)}px Inter, -apple-system, sans-serif`;
+        ctx.strokeText(lines[1], textCenterX, spacing);
+        ctx.fillText(lines[1], textCenterX, spacing);
       } else {
-        // Single-line layout
-        ctx.font = `800 ${fontSize + 1}px Inter, -apple-system, sans-serif`;
-        ctx.strokeText(line1, textCenterX, 0);
-        ctx.fillText(line1, textCenterX, 0);
+        const spacing = Math.max(9, optimalFontSize * 0.88);
+        ctx.strokeText(lines[0], textCenterX, -spacing * 1.15);
+        ctx.fillText(lines[0], textCenterX, -spacing * 1.15);
+
+        ctx.strokeText(lines[1], textCenterX, 0);
+        ctx.fillText(lines[1], textCenterX, 0);
+
+        ctx.strokeText(lines[2], textCenterX, spacing * 1.15);
+        ctx.fillText(lines[2], textCenterX, spacing * 1.15);
       }
       ctx.restore();
 
@@ -465,6 +495,74 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
     };
   }, [isSpinning, targetIndex, slices.length]);
 
+  // Determine which slice corresponds to a canvas pixel position
+  const getSliceAtClientPoint = (clientX: number, clientY: number): RouletteSlice | null => {
+    const canvas = canvasRef.current;
+    if (!canvas || slices.length === 0) return null;
+
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return null;
+
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    const x = (clientX - rect.left) * scaleX;
+    const y = (clientY - rect.top) * scaleY;
+
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const dx = x - centerX;
+    const dy = y - centerY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    // Click must be inside the wheel slices ring (outside center button hub and inside outer rim)
+    if (dist < 105 || dist > 385) return null;
+
+    const angleRad = Math.atan2(dy, dx);
+    const rotationRad = (currentRotationRef.current * Math.PI) / 180;
+    let relativeAngle = angleRad - rotationRad;
+    const twoPi = Math.PI * 2;
+    relativeAngle = ((relativeAngle % twoPi) + twoPi) % twoPi;
+
+    const arcSize = twoPi / slices.length;
+    const sliceIndex = Math.floor(relativeAngle / arcSize) % slices.length;
+    return slices[sliceIndex] || null;
+  };
+
+  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (isSpinning) return;
+    const slice = getSliceAtClientPoint(e.clientX, e.clientY);
+    if (slice) {
+      setSelectedPrize(slice);
+      if (onSelectSlice) {
+        onSelectSlice(slice);
+      }
+    }
+  };
+
+  const handleCanvasTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (isSpinning) return;
+    if (e.changedTouches && e.changedTouches.length > 0) {
+      const touch = e.changedTouches[0];
+      const slice = getSliceAtClientPoint(touch.clientX, touch.clientY);
+      if (slice) {
+        setSelectedPrize(slice);
+        if (onSelectSlice) {
+          onSelectSlice(slice);
+        }
+      }
+    }
+  };
+
+  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (isSpinning) {
+      if (isHoveringSlice) setIsHoveringSlice(false);
+      return;
+    }
+    const slice = getSliceAtClientPoint(e.clientX, e.clientY);
+    setIsHoveringSlice(Boolean(slice));
+  };
+
   return (
     <div className="relative flex flex-col items-center justify-center select-none w-full max-w-[540px] mx-auto p-2">
       {/* Container with shadow glow */}
@@ -490,7 +588,14 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
           ref={canvasRef}
           width={800}
           height={800}
-          className="w-full h-full object-contain filter drop-shadow-2xl transition-transform"
+          onClick={handleCanvasClick}
+          onTouchEnd={handleCanvasTouchEnd}
+          onMouseMove={handleCanvasMouseMove}
+          onMouseLeave={() => setIsHoveringSlice(false)}
+          className={`w-full h-full object-contain filter drop-shadow-2xl transition-transform ${
+            !isSpinning && isHoveringSlice ? 'cursor-pointer' : ''
+          }`}
+          title="Toca cualquier premio para ver su información"
         />
 
         {/* Center Spin Button */}
@@ -508,6 +613,110 @@ export const RouletteWheel: React.FC<RouletteWheelProps> = ({
           <span className="leading-none text-[11px] sm:text-xs font-black">{buttonLabel}</span>
         </button>
       </div>
+
+      {/* Floating Card for Selected Prize */}
+      <AnimatePresence>
+        {selectedPrize && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm"
+            onClick={() => setSelectedPrize(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.88, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.88, opacity: 0, y: 15 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 350 }}
+              className="relative w-full max-w-sm sm:max-w-md bg-white rounded-[2.5rem] p-6 sm:p-7 shadow-2xl border border-slate-100 overflow-hidden text-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Subtle background flair */}
+              <div className="absolute -top-12 -right-12 w-36 h-36 bg-amber-400/20 rounded-full blur-2xl pointer-events-none" />
+              <div className="absolute -bottom-12 -left-12 w-36 h-36 bg-blue-500/15 rounded-full blur-2xl pointer-events-none" />
+
+              {/* Close Button */}
+              <button
+                type="button"
+                onClick={() => setSelectedPrize(null)}
+                className="absolute top-4 right-4 w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 flex items-center justify-center font-bold text-base transition cursor-pointer z-10 shadow-sm"
+                aria-label="Cerrar"
+              >
+                ✕
+              </button>
+
+              {/* Header Badge */}
+              <div className="mb-3">
+                <span
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                    selectedPrize.type === 'gift'
+                      ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                      : selectedPrize.type === 'extra_attempt'
+                      ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                      : 'bg-slate-100 text-slate-700 border border-slate-200'
+                  }`}
+                >
+                  {selectedPrize.type === 'gift'
+                    ? '🎁 Premio en la Ruleta Rusa'
+                    : selectedPrize.type === 'extra_attempt'
+                    ? '⚡ Intento Extra'
+                    : '🍀 Sector de la Ruleta'}
+                </span>
+              </div>
+
+              {/* Large Gift Image */}
+              <div className="relative mx-auto mb-4 w-44 h-44 sm:w-52 sm:h-52 rounded-2xl bg-gradient-to-br from-slate-50 via-white to-slate-100 border border-slate-200/80 shadow-inner flex items-center justify-center overflow-hidden p-3">
+                {selectedPrize.image_url ? (
+                  <img
+                    src={selectedPrize.image_url}
+                    alt={selectedPrize.name}
+                    className="w-full h-full object-contain rounded-xl drop-shadow-md hover:scale-105 transition-transform duration-300"
+                  />
+                ) : (
+                  <div className="text-6xl sm:text-7xl select-none">
+                    {selectedPrize.type === 'gift' ? '🎁' : selectedPrize.type === 'extra_attempt' ? '⚡' : '🍀'}
+                  </div>
+                )}
+              </div>
+
+              {/* Prize Name - Improved text size and no cutoff */}
+              <div className="space-y-2 mb-6">
+                <h3 className="text-xl sm:text-2xl font-black text-slate-900 leading-snug tracking-tight break-words px-2">
+                  {selectedPrize.name.replace(/^🎁\s*/, '')}
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-500 font-medium px-3 leading-relaxed">
+                  {selectedPrize.type === 'gift'
+                    ? '¡Este fabuloso premio puede ser tuyo al girar la ruleta rusa! Si la aguja se detiene en este sector, recibirás un código único para reclamarlo directamente por WhatsApp.'
+                    : selectedPrize.type === 'extra_attempt'
+                    ? '¡Este sector te otorga un tiro extra totalmente gratis para seguir participando!'
+                    : 'Gracias por participar en la dinámica promocional de NewBank.'}
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row gap-2.5 justify-center">
+                {!disabled && !isSpinning && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedPrize(null);
+                      onSpinClick();
+                    }}
+                    className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-amber-600 text-white font-black uppercase text-xs tracking-wider shadow-lg shadow-amber-200 hover:brightness-105 transition cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <span>🎲</span> ¡Girar Ruleta Ahora!
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setSelectedPrize(null)}
+                  className="w-full sm:w-auto px-6 py-3 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-black uppercase text-xs tracking-wider transition cursor-pointer"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
