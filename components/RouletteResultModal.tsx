@@ -97,6 +97,27 @@ export const RouletteResultModal: React.FC<RouletteResultModalProps> = ({
     setMoneySaveError('');
   }, [isOpen, winnerId]);
 
+  // Inyección dinámica del script oficial de Wompi para el widget de pago en caso de no premio
+  useEffect(() => {
+    if (isOpen && result?.result_type === 'no_prize') {
+      const scriptId = 'wompi-roulette-script';
+      const existing = document.getElementById(scriptId);
+      if (existing) {
+        existing.remove();
+      }
+      const script = document.createElement('script');
+      script.id = scriptId;
+      script.src = 'https://pagos.wompi.sv/js/wompi.pagos.js';
+      script.async = true;
+      document.body.appendChild(script);
+
+      return () => {
+        const s = document.getElementById(scriptId);
+        if (s) s.remove();
+      };
+    }
+  }, [isOpen, result?.result_type]);
+
   if (!isOpen || !result) return null;
 
   const handleSavePhone = async () => {
@@ -539,6 +560,24 @@ export const RouletteResultModal: React.FC<RouletteResultModalProps> = ({
                 <p className="font-semibold">
                   ⏳ <strong>Tiempo de espera:</strong> Tu siguiente participación estará habilitada nuevamente en 1 hora.
                 </p>
+              </div>
+
+              {/* Botón de pago Wompi solicitado para reactivar la suerte */}
+              <div className="w-full flex flex-col items-center justify-center pt-1">
+                <div 
+                  className="wompi_button_widget flex items-center justify-center w-full min-h-[48px]" 
+                  data-url-pago="https://pagos.wompi.sv/IntentoPago/Redirect?id=f292f55a-5a34-4387-bea9-3e5a32effcac&esWidget=1" 
+                  data-render="widget"
+                >
+                  <a
+                    href="https://pagos.wompi.sv/IntentoPago/Redirect?id=f292f55a-5a34-4387-bea9-3e5a32effcac&esWidget=1"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-3.5 px-6 bg-[#592c82] hover:bg-[#4a246d] text-white font-black text-xs uppercase tracking-wider rounded-2xl shadow-lg transition flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <span>💳</span> Pagar con Wompi
+                  </a>
+                </div>
               </div>
 
               <div className="flex flex-col gap-3 pt-2">
