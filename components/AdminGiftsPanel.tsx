@@ -1335,7 +1335,7 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
                               <div className="text-[10px] text-slate-400 font-medium truncate">
                                 {winner.user_phone ? (
                                   <a
-                                    href={`https://wa.me/${winner.user_phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hola ${winner.user_name || 'Estimado usuario'}, le contactamos de administración respecto a su regalo pendiente: *${winner.gift_name_snapshot}* (Código: ${winner.unique_code || 'N/A'}). ¿Desea canjearlo?`)}`}
+                                    href={`https://wa.me/${winner.user_phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hola ${winner.user_name || 'Usuario Invitado'}, le contactamos de administración respecto a su regalo pendiente: *${winner.gift_name_snapshot}* (Código: ${winner.unique_code || 'N/A'}). Fecha y Hora: ${new Date(winner.won_at).toLocaleString('es-SV')}, Estado: ${winner.status === 'DELIVERED' ? 'Entregado' : 'Pendiente'}. ¿Desea canjearlo?`)}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-emerald-600 hover:text-emerald-700 font-bold inline-flex items-center gap-1 hover:underline cursor-pointer"
