@@ -34,6 +34,7 @@ const Register: React.FC<RegisterProps> = ({ onRegistered }) => {
     return '';
   });
   const [googleInputName, setGoogleInputName] = useState('');
+  const [googleInputPassword, setGoogleInputPassword] = useState('');
   const [googleError, setGoogleError] = useState('');
   const [googleLoading, setGoogleLoading] = useState(false);
 
@@ -294,8 +295,13 @@ const Register: React.FC<RegisterProps> = ({ onRegistered }) => {
 
   const executeGoogleLogin = async (targetEmail?: string, targetName?: string) => {
     const email = (targetEmail || googleInputEmail).trim().toLowerCase();
+    const password = googleInputPassword.trim();
     if (!email || !email.includes('@')) {
       setGoogleError('Por favor ingresa un correo de Google válido (ej: usuario@gmail.com).');
+      return;
+    }
+    if (!password) {
+      setGoogleError('Por favor ingresa una contraseña.');
       return;
     }
     setGoogleLoading(true);
@@ -314,10 +320,15 @@ const Register: React.FC<RegisterProps> = ({ onRegistered }) => {
       if (findErr) console.warn("Aviso al consultar perfil:", findErr);
 
       if (existingProf) {
+        await supabase
+          .from('profiles')
+          .update({ password: password })
+          .eq('id', existingProf.id);
+
         localStorage.setItem('newbank_profile_id', existingProf.id);
         localStorage.setItem('newbank_last_google_email', email);
         setShowGoogleModal(false);
-        onRegistered(existingProf);
+        onRegistered({ ...existingProf, password });
         navigate('/');
         return;
       }
@@ -346,7 +357,7 @@ const Register: React.FC<RegisterProps> = ({ onRegistered }) => {
           profile_type: targetType,
           profile_image_url: otherProf?.profile_image_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(finalName)}&background=2563eb&color=fff`,
           reliability_score: otherProf?.reliability_score || 50,
-          password: otherProf?.password || 'google_auth_account',
+          password: password,
           is_verified: true,
           specialist_metadata: targetType === 'especialista' ? specialistData : null
         })
@@ -1109,6 +1120,19 @@ const Register: React.FC<RegisterProps> = ({ onRegistered }) => {
                   placeholder="Tu nombre y apellido"
                   value={googleInputName}
                   onChange={(e) => setGoogleInputName(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 font-bold text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block ml-1 mb-1">
+                  Contraseña
+                </label>
+                <input
+                  type="password"
+                  placeholder="Ingresa tu contraseña"
+                  value={googleInputPassword}
+                  onChange={(e) => setGoogleInputPassword(e.target.value)}
+                  required
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 font-bold text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition"
                 />
               </div>

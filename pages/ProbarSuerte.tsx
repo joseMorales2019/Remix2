@@ -255,6 +255,11 @@ export const ProbarSuerte: React.FC<{ user: any }> = ({ user }) => {
 
   // Handle spin button click
   const handleSpinClick = async () => {
+    if (!user || !user.id || !localStorage.getItem('newbank_profile_id') || (guestId === activeUserId && !user?.email)) {
+      alert("Para girar la ruleta rusa y llevar un mejor control, debes iniciar sesión primero.");
+      navigate('/register');
+      return;
+    }
     if (isSpinning || !activeUserId) return;
     if (secondsLeft > 0 && !isExtraAttempt) return;
 

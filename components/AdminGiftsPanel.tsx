@@ -1332,9 +1332,24 @@ export const AdminGiftsPanel: React.FC<AdminGiftsPanelProps> = ({ user, products
                                   </button>
                                 </div>
                               </div>
-                              <p className="text-[10px] text-slate-400 font-medium truncate">
-                                {winner.user_phone ? `📱 ${winner.user_phone}` : winner.user_email ? `✉️ ${winner.user_email}` : 'Sin contacto'}
-                              </p>
+                              <div className="text-[10px] text-slate-400 font-medium truncate">
+                                {winner.user_phone ? (
+                                  <a
+                                    href={`https://wa.me/${winner.user_phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Hola ${winner.user_name || 'Estimado usuario'}, le contactamos de administración respecto a su regalo pendiente: *${winner.gift_name_snapshot}* (Código: ${winner.unique_code || 'N/A'}). ¿Desea canjearlo?`)}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-emerald-600 hover:text-emerald-700 font-bold inline-flex items-center gap-1 hover:underline cursor-pointer"
+                                    title="Abrir chat en WhatsApp con el regalo pendiente"
+                                  >
+                                    <span>📱 {winner.user_phone}</span>
+                                    <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1 py-0.2 rounded font-black">WhatsApp 💬</span>
+                                  </a>
+                                ) : winner.user_email ? (
+                                  `✉️ ${winner.user_email}`
+                                ) : (
+                                  'Sin contacto'
+                                )}
+                              </div>
                             </div>
                           </td>
                           <td className="px-6 py-4 flex items-center gap-2">

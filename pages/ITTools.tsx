@@ -37,6 +37,616 @@ interface ITEquipment {
   description?: string;
 }
 
+const SelectOrInput = ({ value, options, onChange, className }: any) => {
+  const isCustomValue = value && !options.includes(value);
+  const [isCustom, setIsCustom] = useState(isCustomValue && value !== '');
+
+  useEffect(() => {
+    if (value && !options.includes(value) && value !== '') setIsCustom(true);
+  }, [value, options]);
+
+  if (isCustom) {
+    return (
+      <div className="flex gap-1 items-center w-full">
+        <input 
+          autoFocus
+          value={value} 
+          onChange={onChange} 
+          className={className + " flex-1"} 
+          placeholder="Otra..." 
+        />
+        <button 
+          type="button" 
+          onClick={() => {
+            setIsCustom(false);
+            onChange({ target: { value: options[0] || '' } } as any);
+          }} 
+          className="text-red-500 font-bold px-1"
+        >
+          ✕
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <select 
+      value={options.includes(value) ? value : ""} 
+      onChange={(e) => {
+        if (e.target.value === '___OTHER___') {
+          setIsCustom(true);
+          onChange({ target: { value: '' } } as any);
+        } else {
+          onChange(e);
+        }
+      }} 
+      className={className}
+    >
+      {options.map((o: string) => (
+        <option key={o} value={o}>{o}</option>
+      ))}
+      <option value="___OTHER___">Otra (ingresar manual)...</option>
+    </select>
+  );
+};
+
+interface PCFormProps {
+  editingEquipment?: any;
+  selectedCompany?: any;
+  sections?: any[];
+  setEditingEquipment?: any;
+  setView?: any;
+  selectedSection?: any;
+  setSelectedSection?: any;
+  fetchCompanyData?: any;
+  fetchAllEquipment?: any;
+  view?: any;
+  equipment?: any;
+}
+
+const PCForm: React.FC<PCFormProps> = (props) => {
+  const { editingEquipment, selectedCompany, sections, setEditingEquipment, setView, selectedSection, setSelectedSection, fetchCompanyData, fetchAllEquipment, view, equipment } = props;
+  const [formData, setFormData] = useState<any>(() => {
+    if (editingEquipment && editingEquipment.type === 'PC') {
+      return {
+        responsible: editingEquipment.responsible || '',
+        model: editingEquipment.model || '',
+        brand: editingEquipment.brand || '',
+        serial: editingEquipment.serial || '',
+        hw: editingEquipment.hw_data || {
+          processor: { model: 'Intel Core i5', serial: '', cores: '4', status: 'Funcional', comments: '' },
+          ram: [{ type: 'DDR4', capacity: '8GB', serial: '', status: 'Funcional', comments: '' }],
+          disk: [{ type: 'SSD SATA', brand: 'Kingston', capacity: '240GB', serial: '', status: 'Funcional', comments: '' }],
+          video: [{ type: 'Integrada', serial: '', status: 'Funcional', comments: '' }],
+          sound: { brand: 'Realtek', model: 'High Definition Audio' },
+          ports: [{ type: 'USB 3.0', quantity: '2', status: 'Funcional', comments: '' }],
+          monitors: [{ model: '', serial: '', status: 'Funcional', comments: '' }],
+          power_supply: { brand: '', serial: '', model: '', status: 'Funcional' },
+          keyboard: { brand: '', model: '', status: 'Bueno', comments: '' },
+          mouse: { brand: '', model: '', status: 'Bueno', comments: '' }
+        },
+        ups: (editingEquipment.hw_data && editingEquipment.hw_data.ups) ? editingEquipment.hw_data.ups : { brand: 'APC', model: '', serial: '', status: 'Operativo', comments: '' },
+        maintenance: editingEquipment.maintenance_history || [],
+        sw: editingEquipment.sw_data || { os: 'Windows 10 Pro', arch: '64-bit', comments: '' },
+        net: editingEquipment.net_data || { ip: '', type: 'DHCP/Dinámica', mask: '', gateway: '', dns: '', port: '', comments: '' }
+      };
+    }
+    return {
+      responsible: '',
+      model: '',
+      brand: '',
+      serial: '',
+      hw: {
+        processor: { model: 'Intel Core i5', serial: '', cores: '4', status: 'Funcional', comments: '' },
+        ram: [{ type: 'DDR4', capacity: '8GB', serial: '', status: 'Funcional', comments: '' }],
+        disk: [{ type: 'SSD SATA', brand: 'Kingston', capacity: '240GB', serial: '', status: 'Funcional', comments: '' }],
+        video: [{ type: 'Integrada', serial: '', status: 'Funcional', comments: '' }],
+        sound: { brand: 'Realtek', model: 'High Definition Audio' },
+        ports: [{ type: 'USB 3.0', quantity: '2', status: 'Funcional', comments: '' }],
+        monitors: [{ model: '', serial: '', status: 'Funcional', comments: '' }],
+        power_supply: { brand: '', serial: '', model: '', status: 'Funcional' },
+        keyboard: { brand: '', model: '', status: 'Bueno', comments: '' },
+        mouse: { brand: '', model: '', status: 'Bueno', comments: '' }
+      },
+      ups: { brand: 'APC', model: '', serial: '', status: 'Operativo', comments: '' },
+      maintenance: [],
+      sw: { os: 'Windows 10 Pro', arch: '64-bit', comments: '' },
+      net: { ip: '', type: 'DHCP/Dinámica', mask: '', gateway: '', dns: '', port: '', comments: '' }
+    };
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedSection) {
+      alert("Selecciona un departamento");
+      return;
+    }
+    
+    const hwDataToSave = { ...formData.hw, ups: formData.ups };
+    
+    const payload = {
+      company_id: selectedCompany?.id,
+      section_id: selectedSection,
+      type: 'PC',
+      responsible: formData.responsible,
+      brand: formData.brand,
+      model: formData.model,
+      serial: formData.serial,
+      status: 'Funcional',
+      hw_data: hwDataToSave,
+      sw_data: formData.sw,
+      net_data: formData.net,
+      maintenance_history: formData.maintenance
+    };
+
+    let error;
+    if (editingEquipment) {
+      (payload.hw_data as any).last_updated_at = new Date().toISOString();
+      const res = await supabase.from('it_equipment').update(payload).eq('id', editingEquipment.id);
+      error = res.error;
+    } else {
+      const res = await supabase.from('it_equipment').insert([payload]);
+      error = res.error;
+    }
+
+    if (!error) {
+      setEditingEquipment(null);
+      setView('company_details');
+      if (selectedCompany) fetchCompanyData(selectedCompany);
+      if (view === 'all_inventory') fetchAllEquipment();
+    } else {
+      alert("Error guardando PC");
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-8 bg-white p-4 sm:p-8 rounded-3xl shadow-xl shadow-slate-100 max-w-4xl mx-auto">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-black text-slate-900 uppercase">{editingEquipment ? 'Editar PC' : 'Agregar Nueva PC'}</h2>
+        <button type="button" onClick={() => { setEditingEquipment(null); setView('company_details'); }} className="text-slate-400 hover:text-slate-900 transition-all font-bold text-sm">Cerrar</button>
+      </div>
+
+      <section className="space-y-4">
+        <div className="flex items-center gap-2 border-b-2 border-blue-600 pb-1 w-fit">
+          <span className="text-xl">🏢</span>
+          <h3 className="font-black text-slate-800 uppercase text-xs tracking-widest">Datos de Empresa</h3>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-[10px] font-black uppercase text-slate-400 mb-1 ml-1">Empresa</label>
+            <input type="text" readOnly value={selectedCompany?.name} className="w-full bg-slate-50 border-none rounded-xl p-3 font-bold text-slate-600 cursor-not-allowed" />
+          </div>
+          <div>
+            <label className="block text-[10px] font-black uppercase text-slate-400 mb-1 ml-1">Sección/Departamento</label>
+            <select 
+              required
+              value={selectedSection}
+              onChange={(e) => setSelectedSection(e.target.value)}
+              className="w-full bg-slate-50 border-none rounded-xl p-3 font-bold text-slate-900 focus:ring-2 focus:ring-blue-600 transition-all"
+            >
+              <option value="">Seleccionar...</option>
+              {sections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+        </div>
+        <div>
+          <label className="block text-[10px] font-black uppercase text-slate-400 mb-1 ml-1">Responsable del Equipo</label>
+          <input 
+            required
+            type="text" 
+            value={formData.responsible}
+            onChange={(e) => setFormData({...formData, responsible: e.target.value})}
+            placeholder="Nombre completo"
+            className="w-full bg-white border border-slate-200 rounded-xl p-3 font-bold text-slate-900 focus:ring-2 focus:ring-blue-600 transition-all" 
+          />
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex items-center gap-2 border-b-2 border-blue-600 pb-1 w-fit">
+          <span className="text-xl">💻</span>
+          <h3 className="font-black text-slate-800 uppercase text-xs tracking-widest">Datos Generales PC</h3>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-[10px] font-black uppercase text-slate-400 mb-1 ml-1">Marca</label>
+            <input type="text" value={formData.brand} onChange={(e) => setFormData({...formData, brand: e.target.value})} className="w-full bg-slate-50 border-none rounded-xl p-3 font-bold" />
+          </div>
+          <div>
+            <label className="block text-[10px] font-black uppercase text-slate-400 mb-1 ml-1">Modelo</label>
+            <input type="text" value={formData.model} onChange={(e) => setFormData({...formData, model: e.target.value})} className="w-full bg-slate-50 border-none rounded-xl p-3 font-bold" />
+          </div>
+          <div>
+            <label className="block text-[10px] font-black uppercase text-slate-400 mb-1 ml-1">Serial</label>
+            <input type="text" value={formData.serial} onChange={(e) => setFormData({...formData, serial: e.target.value})} className="w-full bg-slate-50 border-none rounded-xl p-3 font-bold" />
+          </div>
+        </div>
+      </section>
+
+      {/* Procesador */}
+      <section className="p-4 bg-slate-50 rounded-2xl space-y-4">
+        <h4 className="font-black text-slate-900 uppercase text-xs">🛠️ Procesador</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <SelectOrInput 
+            options={['Intel Core i3', 'Intel Core i5', 'Intel Core i7', 'Intel Core i9', 'Xeon', 'AMD Ryzen 3', 'AMD Ryzen 5', 'AMD Ryzen 7', 'AMD Ryzen 9', 'Threadripper']}
+            value={formData.hw.processor.model} onChange={(e:any) => setFormData({...formData, hw: {...formData.hw, processor: {...formData.hw.processor, model: e.target.value}}})} className="p-2 rounded-xl font-bold text-xs" />
+          <input placeholder="Serial" value={formData.hw.processor.serial} onChange={e => setFormData({...formData, hw: {...formData.hw, processor: {...formData.hw.processor, serial: e.target.value}}})} className="p-2 rounded-xl font-bold text-xs" />
+          <SelectOrInput 
+            options={['2', '4', '6', '8', '10', '12', '16', '24', '32', '+']}
+            value={formData.hw.processor.cores} onChange={(e:any) => setFormData({...formData, hw: {...formData.hw, processor: {...formData.hw.processor, cores: e.target.value}}})} className="p-2 rounded-xl font-bold text-xs" />
+          <SelectOrInput 
+            options={['Nuevo', 'Funcional', 'Dañado', 'Obsoleto']}
+            value={formData.hw.processor.status} onChange={(e:any) => setFormData({...formData, hw: {...formData.hw, processor: {...formData.hw.processor, status: e.target.value}}})} className="p-2 rounded-xl font-bold text-xs" />
+        </div>
+        <input placeholder="Comentarios (opcional)" value={formData.hw.processor.comments || ''} onChange={e => setFormData({...formData, hw: {...formData.hw, processor: {...formData.hw.processor, comments: e.target.value}}})} className="w-full p-2 rounded-xl font-bold text-xs border border-slate-200" />
+      </section>
+
+      {/* RAM */}
+      <section className="p-4 bg-slate-50 rounded-2xl space-y-4">
+        <div className="flex justify-between items-center">
+          <h4 className="font-black text-slate-900 uppercase text-xs">💾 Memoria RAM</h4>
+          <button type="button" onClick={() => setFormData({...formData, hw: {...formData.hw, ram: [...formData.hw.ram, { type: 'DDR4', capacity: '8GB', serial: '', status: 'Funcional', comments: '' }]}})} className="text-[10px] font-black text-blue-600 uppercase">+ Agregar RAM</button>
+        </div>
+        {formData.hw.ram.map((r: any, idx: number) => (
+          <div key={idx} className="pb-2 border-b border-slate-200 last:border-0">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-2">
+               <SelectOrInput options={['DDR3', 'DDR4', 'DDR5']} value={r.type} onChange={(e:any) => { const n = [...formData.hw.ram]; n[idx].type = e.target.value; setFormData({...formData, hw: {...formData.hw, ram: n}})}} className="p-2 rounded-xl font-bold text-xs border border-slate-200" />
+               <SelectOrInput options={['4GB', '8GB', '16GB', '32GB', '64GB', '+']} value={r.capacity} onChange={(e:any) => { const n = [...formData.hw.ram]; n[idx].capacity = e.target.value; setFormData({...formData, hw: {...formData.hw, ram: n}})}} className="p-2 rounded-xl font-bold text-xs border border-slate-200" />
+               <input placeholder="Serial" value={r.serial} onChange={e => { const n = [...formData.hw.ram]; n[idx].serial = e.target.value; setFormData({...formData, hw: {...formData.hw, ram: n}})}} className="p-2 rounded-xl font-bold text-xs border border-slate-200" />
+               <SelectOrInput options={['Nuevo', 'Funcional', 'Dañado']} value={r.status} onChange={(e:any) => { const n = [...formData.hw.ram]; n[idx].status = e.target.value; setFormData({...formData, hw: {...formData.hw, ram: n}})}} className="p-2 rounded-xl font-bold text-xs border border-slate-200" />
+            </div>
+            <input placeholder="Comentarios (opcional)" value={r.comments || ''} onChange={e => { const n = [...formData.hw.ram]; n[idx].comments = e.target.value; setFormData({...formData, hw: {...formData.hw, ram: n}})}} className="w-full p-2 rounded-xl font-bold text-xs border border-slate-200" />
+          </div>
+        ))}
+      </section>
+
+      {/* Almacenamiento */}
+      <section className="p-4 bg-slate-50 rounded-2xl space-y-4">
+        <div className="flex justify-between items-center">
+          <h4 className="font-black text-slate-900 uppercase text-xs">💽 Disco Duro</h4>
+          <button type="button" onClick={() => setFormData({...formData, hw: {...formData.hw, disk: [...formData.hw.disk, { type: 'SSD SATA', brand: 'Kingston', capacity: '240GB', serial: '', status: 'Funcional', comments: '' }]}})} className="text-[10px] font-black text-blue-600 uppercase">+ Agregar Disco</button>
+        </div>
+        {formData.hw.disk.map((d: any, idx: number) => (
+          <div key={idx} className="pb-2 border-b border-slate-200 last:border-0">
+             <div className="grid grid-cols-1 md:grid-cols-6 gap-2 items-end mb-2">
+               <div className="col-span-1">
+                 <label className="text-[8px] font-black uppercase text-slate-400">Tipo</label>
+                 <SelectOrInput options={['SSD SATA', 'SSD M.2 NVMe', 'HDD SATA', 'HDD SAS', 'Híbrido']} value={d.type} onChange={(e:any) => { const n = [...formData.hw.disk]; n[idx].type = e.target.value; setFormData({...formData, hw: {...formData.hw, disk: n}})}} className="w-full p-2 rounded-xl font-bold text-xs border border-slate-200" />
+               </div>
+               <div className="col-span-1">
+                 <label className="text-[8px] font-black uppercase text-slate-400">Marca</label>
+                 <SelectOrInput options={['Western Digital', 'Seagate', 'Samsung', 'Kingston', 'Crucial', 'Toshiba', 'ADATA']} value={d.brand} onChange={(e:any) => { const n = [...formData.hw.disk]; n[idx].brand = e.target.value; setFormData({...formData, hw: {...formData.hw, disk: n}})}} className="w-full p-2 rounded-xl font-bold text-xs border border-slate-200" />
+               </div>
+               <div className="col-span-1">
+                 <label className="text-[8px] font-black uppercase text-slate-400">Capacidad</label>
+                 <SelectOrInput options={['120GB', '240GB', '480GB', '500GB', '1TB', '2TB', '+']} value={d.capacity} onChange={(e:any) => { const n = [...formData.hw.disk]; n[idx].capacity = e.target.value; setFormData({...formData, hw: {...formData.hw, disk: n}})}} className="w-full p-2 rounded-xl font-bold text-xs border border-slate-200" />
+               </div>
+               <div className="col-span-1">
+                 <label className="text-[8px] font-black uppercase text-slate-400">Serial</label>
+                 <input placeholder="Serial" value={d.serial} onChange={e => { const n = [...formData.hw.disk]; n[idx].serial = e.target.value; setFormData({...formData, hw: {...formData.hw, disk: n}})}} className="w-full p-2 rounded-xl font-bold text-xs border border-slate-200" />
+               </div>
+               <div className="col-span-1">
+                 <label className="text-[8px] font-black uppercase text-slate-400">Estado</label>
+                 <SelectOrInput options={['Bueno', 'Funcional', 'Alerta', 'Falla']} value={d.status} onChange={(e:any) => { const n = [...formData.hw.disk]; n[idx].status = e.target.value; setFormData({...formData, hw: {...formData.hw, disk: n}})}} className="w-full p-2 rounded-xl font-bold text-xs border border-slate-200" />
+               </div>
+               <button type="button" onClick={() => { const n = formData.hw.disk.filter((_:any, i:any) => i !== idx); setFormData({...formData, hw: {...formData.hw, disk: n}})}} className="p-2 text-red-500 font-bold">✕</button>
+             </div>
+             <input placeholder="Comentarios (opcional)" value={d.comments || ''} onChange={e => { const n = [...formData.hw.disk]; n[idx].comments = e.target.value; setFormData({...formData, hw: {...formData.hw, disk: n}})}} className="w-full p-2 rounded-xl font-bold text-xs border border-slate-200" />
+          </div>
+        ))}
+      </section>
+
+      {/* Tarjeta de Video */}
+      <section className="p-4 bg-slate-50 rounded-2xl space-y-4">
+        <div className="flex justify-between items-center">
+          <h4 className="font-black text-slate-900 uppercase text-xs">🎮 Tarjeta de Video</h4>
+          <button type="button" onClick={() => setFormData({...formData, hw: {...formData.hw, video: [...formData.hw.video, { type: 'Dedicada - NVIDIA', serial: '', status: 'Funcional', comments: '' }]}})} className="text-[10px] font-black text-blue-600 uppercase">+ Agregar Video</button>
+        </div>
+        {formData.hw.video.map((v: any, idx: number) => (
+          <div key={idx} className="pb-2 border-b border-slate-200 last:border-0">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end mb-2">
+              <div>
+                <label className="text-[8px] font-black uppercase text-slate-400">Tipo</label>
+                <SelectOrInput options={['Integrada', 'Dedicada - NVIDIA', 'Dedicada - AMD']} value={v.type} onChange={(e:any) => { const n = [...formData.hw.video]; n[idx].type = e.target.value; setFormData({...formData, hw: {...formData.hw, video: n}})}} className="w-full p-2 rounded-xl font-bold text-xs border border-slate-200" />
+              </div>
+              <div>
+                <label className="text-[8px] font-black uppercase text-slate-400">Serial</label>
+                <input placeholder="Serial" value={v.serial} onChange={e => { const n = [...formData.hw.video]; n[idx].serial = e.target.value; setFormData({...formData, hw: {...formData.hw, video: n}})}} className="w-full p-2 rounded-xl font-bold text-xs border border-slate-200" />
+              </div>
+              <div>
+                <label className="text-[8px] font-black uppercase text-slate-400">Estado</label>
+                <SelectOrInput options={['Funcional', 'Dañada']} value={v.status} onChange={(e:any) => { const n = [...formData.hw.video]; n[idx].status = e.target.value; setFormData({...formData, hw: {...formData.hw, video: n}})}} className="w-full p-2 rounded-xl font-bold text-xs border border-slate-200" />
+              </div>
+              <button type="button" onClick={() => { const n = formData.hw.video.filter((_:any, i:any) => i !== idx); setFormData({...formData, hw: {...formData.hw, video: n}})}} className="p-2 text-red-500 font-bold w-fit">✕</button>
+            </div>
+            <input placeholder="Comentarios (opcional)" value={v.comments || ''} onChange={e => { const n = [...formData.hw.video]; n[idx].comments = e.target.value; setFormData({...formData, hw: {...formData.hw, video: n}})}} className="w-full p-2 rounded-xl font-bold text-xs border border-slate-200" />
+          </div>
+        ))}
+      </section>
+
+      {/* Puertos */}
+      <section className="p-4 bg-slate-50 rounded-2xl space-y-4">
+        <div className="flex justify-between items-center">
+          <h4 className="font-black text-slate-900 uppercase text-xs">🔌 Puertos</h4>
+          <button type="button" onClick={() => setFormData({...formData, hw: {...formData.hw, ports: [...formData.hw.ports, { type: 'USB 3.0', quantity: '1', status: 'Funcional', comments: '' }]}})} className="text-[10px] font-black text-blue-600 uppercase">+ Agregar Puerto</button>
+        </div>
+        {formData.hw.ports.map((p: any, idx: number) => (
+          <div key={idx} className="pb-2 border-b border-slate-200 last:border-0">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end mb-2">
+              <SelectOrInput options={['USB 2.0', 'USB 3.0', 'USB-C', 'HDMI', 'DisplayPort', 'Ethernet/RJ45', 'Jack 3.5mm']} value={p.type} onChange={(e:any) => { const n = [...formData.hw.ports]; n[idx].type = e.target.value; setFormData({...formData, hw: {...formData.hw, ports: n}})}} className="p-2 rounded-xl font-bold text-xs border border-slate-200" />
+              <input type="number" placeholder="Cant." value={p.quantity} onChange={e => { const n = [...formData.hw.ports]; n[idx].quantity = e.target.value; setFormData({...formData, hw: {...formData.hw, ports: n}})}} className="p-2 rounded-xl font-bold text-xs border border-slate-200" />
+              <SelectOrInput options={['Funcional', 'Dañado', 'Sucio']} value={p.status} onChange={(e:any) => { const n = [...formData.hw.ports]; n[idx].status = e.target.value; setFormData({...formData, hw: {...formData.hw, ports: n}})}} className="p-2 rounded-xl font-bold text-xs border border-slate-200" />
+              <button type="button" onClick={() => { const n = formData.hw.ports.filter((_:any, i:any) => i !== idx); setFormData({...formData, hw: {...formData.hw, ports: n}})}} className="p-2 text-red-500 font-bold w-fit">✕</button>
+            </div>
+            <input placeholder="Comentarios (opcional)" value={p.comments || ''} onChange={e => { const n = [...formData.hw.ports]; n[idx].comments = e.target.value; setFormData({...formData, hw: {...formData.hw, ports: n}})}} className="w-full p-2 rounded-xl font-bold text-xs border border-slate-200" />
+          </div>
+        ))}
+      </section>
+
+      {/* Monitores */}
+      <section className="p-4 bg-slate-50 rounded-2xl space-y-4">
+        <div className="flex justify-between items-center">
+          <h4 className="font-black text-slate-900 uppercase text-xs">🖥️ Monitor</h4>
+          <button type="button" onClick={() => setFormData({...formData, hw: {...formData.hw, monitors: [...formData.hw.monitors, { model: '', serial: '', status: 'Funcional', comments: '' }]}})} className="text-[10px] font-black text-blue-600 uppercase">+ Agregar Monitor</button>
+        </div>
+        {formData.hw.monitors.map((m: any, idx: number) => (
+          <div key={idx} className="pb-2 border-b border-slate-200 last:border-0">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end mb-2">
+              <input placeholder="Modelo" value={m.model} onChange={e => { const n = [...formData.hw.monitors]; n[idx].model = e.target.value; setFormData({...formData, hw: {...formData.hw, monitors: n}})}} className="p-2 rounded-xl font-bold text-xs border border-slate-200" />
+              <input placeholder="Serial" value={m.serial} onChange={e => { const n = [...formData.hw.monitors]; n[idx].serial = e.target.value; setFormData({...formData, hw: {...formData.hw, monitors: n}})}} className="p-2 rounded-xl font-bold text-xs border border-slate-200" />
+              <SelectOrInput options={['Funcional', 'Dañado', 'Píxeles muertos']} value={m.status} onChange={(e:any) => { const n = [...formData.hw.monitors]; n[idx].status = e.target.value; setFormData({...formData, hw: {...formData.hw, monitors: n}})}} className="p-2 rounded-xl font-bold text-xs border border-slate-200" />
+              <button type="button" onClick={() => { const n = formData.hw.monitors.filter((_:any, i:any) => i !== idx); setFormData({...formData, hw: {...formData.hw, monitors: n}})}} className="p-2 text-red-500 font-bold w-fit">✕</button>
+            </div>
+            <input placeholder="Comentarios (opcional)" value={m.comments || ''} onChange={e => { const n = [...formData.hw.monitors]; n[idx].comments = e.target.value; setFormData({...formData, hw: {...formData.hw, monitors: n}})}} className="w-full p-2 rounded-xl font-bold text-xs border border-slate-200" />
+          </div>
+        ))}
+      </section>
+
+      {/* UPS */}
+      <section className="p-4 bg-slate-50 rounded-2xl space-y-4">
+        <h4 className="font-black text-slate-900 uppercase text-xs">🔋 UPS Asignado</h4>
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-2 mb-2">
+            <label className="text-[10px] font-black uppercase text-slate-400">Seleccionar UPS existente</label>
+            <select 
+              onChange={(e) => {
+                const selectedU = equipment.find((eq: any) => eq.id === e.target.value);
+                if (selectedU) {
+                  setFormData({...formData, ups: { brand: selectedU.brand, model: selectedU.model, serial: selectedU.serial, status: selectedU.status, comments: selectedU.description }});
+                }
+              }}
+              className="p-2 rounded-xl font-bold text-xs bg-white border border-slate-200"
+            >
+              <option value="">-- Buscar UPS en inventario --</option>
+              {equipment.filter((e: any) => e.type === 'UPS').map((u: any) => (
+                <option key={u.id} value={u.id}>{u.brand} {u.model} ({u.serial})</option>
+              ))}
+            </select>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <SelectOrInput options={['APC', 'Tripp Lite', 'CyberPower', 'Forza', '+']} value={formData.ups.brand} onChange={(e:any) => setFormData({...formData, ups: {...formData.ups, brand: e.target.value}})} className="p-2 rounded-xl font-bold text-xs border border-slate-200" />
+            <input placeholder="Modelo" value={formData.ups.model} onChange={e => setFormData({...formData, ups: {...formData.ups, model: e.target.value}})} className="p-2 rounded-xl font-bold text-xs border border-slate-200" />
+            <input placeholder="Serie" value={formData.ups.serial} onChange={e => setFormData({...formData, ups: {...formData.ups, serial: e.target.value}})} className="p-2 rounded-xl font-bold text-xs border border-slate-200" />
+            <SelectOrInput options={['Operativo', 'Batería agotada', 'Dañado']} value={formData.ups.status} onChange={(e:any) => setFormData({...formData, ups: {...formData.ups, status: e.target.value}})} className="p-2 rounded-xl font-bold text-xs border border-slate-200" />
+          </div>
+          <input placeholder="Comentarios (opcional)" value={formData.ups.comments || ''} onChange={e => setFormData({...formData, ups: {...formData.ups, comments: e.target.value}})} className="w-full p-2 rounded-xl font-bold text-xs border border-slate-200" />
+        </div>
+      </section>
+
+      {/* Mantenimiento */}
+      <section className="p-4 bg-slate-50 rounded-2xl space-y-4">
+        <div className="flex justify-between items-center">
+          <h4 className="font-black text-slate-900 uppercase text-xs">📅 Historial de Mantenimientos</h4>
+          <button type="button" onClick={() => setFormData({...formData, maintenance: [...formData.maintenance, { type: 'Preventivo', date: new Date().toISOString(), comments: '' }]})} className="text-[10px] font-black text-blue-600 uppercase">+ Agregar Mantenimiento</button>
+        </div>
+        {formData.maintenance.map((m: any, idx: number) => (
+          <div key={idx} className="pb-2 border-b border-slate-200 last:border-0">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end mb-2">
+              <SelectOrInput options={['Preventivo', 'Correctivo', 'Evolutivo']} value={m.type} onChange={(e:any) => { const n = [...formData.maintenance]; n[idx].type = e.target.value; setFormData({...formData, maintenance: n})}} className="p-2 rounded-xl font-bold text-xs border border-slate-200" />
+              <input type="datetime-local" value={m.date.split('.')[0]} onChange={e => { const n = [...formData.maintenance]; n[idx].date = e.target.value; setFormData({...formData, maintenance: n})}} className="p-2 rounded-xl font-bold text-xs border border-slate-200" />
+              <button type="button" onClick={() => { const n = formData.maintenance.filter((_:any, i:any) => i !== idx); setFormData({...formData, maintenance: n})}} className="p-2 text-red-500 font-bold w-fit">✕</button>
+            </div>
+            <input placeholder="Comentarios (opcional)" value={m.comments || ''} onChange={e => { const n = [...formData.maintenance]; n[idx].comments = e.target.value; setFormData({...formData, maintenance: n})}} className="w-full p-2 rounded-xl font-bold text-xs border border-slate-200" />
+          </div>
+        ))}
+      </section>
+
+      {/* Software y Red */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+         <section className="p-6 bg-slate-50 rounded-3xl space-y-4 flex flex-col">
+            <h4 className="font-black text-slate-900 uppercase text-xs">💿 Software</h4>
+            <div className="space-y-4 flex-grow">
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase">Sistema Operativo</label>
+                <SelectOrInput options={['Windows 10 Pro', 'Windows 11 Pro', 'Windows 10 Home', 'Linux Ubuntu', 'Linux Debian', 'macOS']} value={formData.sw.os} onChange={(e:any) => setFormData({...formData, sw: {...formData.sw, os: e.target.value}})} className="w-full p-2 rounded-xl font-bold text-xs mt-1 border border-slate-200" />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase">Arquitectura</label>
+                <SelectOrInput options={['64-bit', '32-bit']} value={formData.sw.arch} onChange={(e:any) => setFormData({...formData, sw: {...formData.sw, arch: e.target.value}})} className="w-full p-2 rounded-xl font-bold text-xs mt-1 border border-slate-200" />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase">Comentarios (opcional)</label>
+                <input value={formData.sw.comments || ''} onChange={e => setFormData({...formData, sw: {...formData.sw, comments: e.target.value}})} className="w-full p-2 rounded-xl font-bold text-xs mt-1 border border-slate-200" placeholder="Ej. Antivirus instalado, Office 365, etc." />
+              </div>
+            </div>
+         </section>
+
+         <section className="p-6 bg-slate-50 rounded-3xl space-y-4">
+            <h4 className="font-black text-slate-900 uppercase text-xs">🌐 Configuración de Red</h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase">IP</label>
+                <input value={formData.net.ip} onChange={e => setFormData({...formData, net: {...formData.net, ip: e.target.value}})} className="w-full p-2 rounded-xl font-bold text-xs mt-1 border border-slate-200" />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-slate-400 uppercase">Tipo</label>
+                <SelectOrInput options={['DHCP/Dinámica', 'Estática']} value={formData.net.type} onChange={(e:any) => setFormData({...formData, net: {...formData.net, type: e.target.value}})} className="w-full p-2 rounded-xl font-bold text-xs mt-1 border border-slate-200" />
+              </div>
+              <input placeholder="Máscara" value={formData.net.mask} onChange={e => setFormData({...formData, net: {...formData.net, mask: e.target.value}})} className="w-full p-2 rounded-xl font-bold text-xs mt-1 border border-slate-200" />
+              <input placeholder="Puerta Enlace" value={formData.net.gateway} onChange={e => setFormData({...formData, net: {...formData.net, gateway: e.target.value}})} className="w-full p-2 rounded-xl font-bold text-xs mt-1 border border-slate-200" />
+            </div>
+            <input placeholder="Comentarios de red (opcional)" value={formData.net.comments || ''} onChange={e => setFormData({...formData, net: {...formData.net, comments: e.target.value}})} className="w-full p-2 rounded-xl font-bold text-xs mt-2 border border-slate-200" />
+         </section>
+      </div>
+
+      <button 
+        type="submit" 
+        className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black uppercase tracking-[0.2em] shadow-xl shadow-blue-100 hover:scale-[1.02] active:scale-[0.98] transition-all"
+      >
+        Guardar PC Completa
+      </button>
+    </form>
+  );
+};
+
+interface ComponentFormProps {
+  editingEquipment?: any;
+  selectedCompany?: any;
+  sections?: any[];
+  setEditingEquipment?: any;
+  setView?: any;
+  selectedSection?: any;
+  setSelectedSection?: any;
+  compType?: any;
+  fetchCompanyData?: any;
+  fetchAllEquipment?: any;
+  view?: any;
+}
+
+const ComponentForm: React.FC<ComponentFormProps> = (props) => {
+  const { editingEquipment, selectedCompany, sections, setEditingEquipment, setView, selectedSection, setSelectedSection, compType, fetchCompanyData, fetchAllEquipment, view } = props;
+  const [formData, setFormData] = useState<any>(() => {
+    if (editingEquipment && editingEquipment.type !== 'PC') {
+      const hw = editingEquipment.hw_data || {};
+      return {
+        responsible: editingEquipment.responsible || '',
+        brand: editingEquipment.brand || '',
+        model: editingEquipment.model || '',
+        serial: editingEquipment.serial || '',
+        type_printing: hw.type_printing || '',
+        connectivity: hw.connectivity || '',
+        page_counter: hw.page_counter || '',
+        capacity: hw.capacity || '',
+        status: editingEquipment.status || 'Operativa',
+        description: editingEquipment.description || '',
+        length: hw.length || '',
+        assigned_to: hw.assigned_to || ''
+      };
+    }
+    return {
+      responsible: '',
+      brand: '',
+      model: '',
+      serial: '',
+      type_printing: '',
+      connectivity: '',
+      page_counter: '',
+      capacity: '',
+      status: 'Operativa',
+      description: '',
+      length: '',
+      assigned_to: ''
+    };
+  });
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const payload = {
+      company_id: selectedCompany?.id,
+      section_id: selectedSection,
+      type: compType,
+      responsible: formData.responsible,
+      brand: formData.brand,
+      model: formData.model,
+      serial: formData.serial,
+      status: formData.status,
+      hw_data: {
+        type_printing: formData.type_printing,
+        connectivity: formData.connectivity,
+        page_counter: formData.page_counter,
+        capacity: formData.capacity,
+        length: formData.length,
+        assigned_to: formData.assigned_to
+      },
+      description: formData.description
+    };
+
+    let error;
+    if (editingEquipment) {
+      (payload.hw_data as any).last_updated_at = new Date().toISOString();
+      const res = await supabase.from('it_equipment').update(payload).eq('id', editingEquipment.id);
+      error = res.error;
+    } else {
+      const res = await supabase.from('it_equipment').insert([payload]);
+      error = res.error;
+    }
+
+    if (!error) {
+      setEditingEquipment(null);
+      setView('company_details');
+      if (selectedCompany) fetchCompanyData(selectedCompany);
+      if (view === 'all_inventory') fetchAllEquipment();
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6 bg-white p-8 rounded-3xl shadow-xl max-w-2xl mx-auto">
+      <div className="flex justify-between items-center mb-8">
+        <h2 className="text-xl font-black text-slate-900 uppercase">{editingEquipment ? `Editar ${compType}` : `Agregar ${compType}`}</h2>
+        <button type="button" onClick={() => { setEditingEquipment(null); setView('company_details'); }} className="text-slate-400">Cerrar</button>
+      </div>
+
+      <select 
+        required
+        value={selectedSection}
+        onChange={(e) => setSelectedSection(e.target.value)}
+        className="w-full bg-slate-50 p-4 rounded-xl font-bold"
+      >
+        <option value="">Seleccionar Departamento...</option>
+        {sections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+      </select>
+
+      <input placeholder="Responsable" required value={formData.responsible} onChange={e => setFormData({...formData, responsible: e.target.value})} className="w-full border p-4 rounded-xl font-bold" />
+      <div className="grid grid-cols-2 gap-4">
+        <input placeholder="Marca" value={formData.brand} onChange={e => setFormData({...formData, brand: e.target.value})} className="border p-4 rounded-xl font-bold" />
+        <input placeholder="Modelo" value={formData.model} onChange={e => setFormData({...formData, model: e.target.value})} className="border p-4 rounded-xl font-bold" />
+      </div>
+      <input placeholder="Serial" value={formData.serial} onChange={e => setFormData({...formData, serial: e.target.value})} className="w-full border p-4 rounded-xl font-bold" />
+
+      {compType === 'Impresora' && (
+        <div className="grid grid-cols-2 gap-4">
+          <select value={formData.type_printing} onChange={e => setFormData({...formData, type_printing: e.target.value})} className="border p-4 rounded-xl font-bold">
+            <option value="">Tipo Impresión</option>
+            {['Inyección de tinta', 'Láser', 'Térmica'].map(o => <option key={o}>{o}</option>)}
+          </select>
+          <input placeholder="Conectividad (USB, Wi-Fi)" value={formData.connectivity} onChange={e => setFormData({...formData, connectivity: e.target.value})} className="border p-4 rounded-xl font-bold" />
+        </div>
+      )}
+
+      {compType === 'UPS' && (
+        <div className="grid grid-cols-2 gap-4">
+          <input placeholder="Capacidad (VA/Watts)" value={formData.capacity} onChange={e => setFormData({...formData, capacity: e.target.value})} className="border p-4 rounded-xl font-bold" />
+          <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} className="border p-4 rounded-xl font-bold">
+            {['Operativa', 'Nueva', 'Requiere cambio'].map(o => <option key={o}>{o}</option>)}
+          </select>
+        </div>
+      )}
+
+      {compType === 'Cable/Adaptador' && (
+        <div className="grid grid-cols-2 gap-4">
+          <input placeholder="Longitud (metros)" value={formData.length} onChange={e => setFormData({...formData, length: e.target.value})} className="border p-4 rounded-xl font-bold" />
+          <input placeholder="Asignado a (Puesto)" value={formData.assigned_to} onChange={e => setFormData({...formData, assigned_to: e.target.value})} className="border p-4 rounded-xl font-bold" />
+        </div>
+      )}
+
+      <textarea placeholder="Observaciones" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full border p-4 rounded-xl font-bold h-32" />
+
+      <button className="w-full bg-blue-600 text-white p-4 rounded-xl font-bold uppercase">Guardar Componente</button>
+    </form>
+  );
+};
+
 const ITTools: React.FC<{ user: any }> = ({ user }) => {
   const [view, setView] = useState<'companies' | 'company_details' | 'form_pc' | 'form_component' | 'all_inventory' | 'manage_sections' | 'diagram'>('companies');
   const [companies, setCompanies] = useState<ITCompany[]>([]);
@@ -804,138 +1414,7 @@ const ITTools: React.FC<{ user: any }> = ({ user }) => {
     );
   };
 
-  const ComponentForm = () => {
-    const [formData, setFormData] = useState<any>(() => {
-      if (editingEquipment && editingEquipment.type !== 'PC') {
-        const hw = editingEquipment.hw_data || {};
-        return {
-          responsible: editingEquipment.responsible || '',
-          brand: editingEquipment.brand || '',
-          model: editingEquipment.model || '',
-          serial: editingEquipment.serial || '',
-          type_printing: hw.type_printing || '',
-          connectivity: hw.connectivity || '',
-          page_counter: hw.page_counter || '',
-          capacity: hw.capacity || '',
-          status: editingEquipment.status || 'Operativa',
-          description: editingEquipment.description || '',
-          length: hw.length || '',
-          assigned_to: hw.assigned_to || ''
-        };
-      }
-      return {
-        responsible: '',
-        brand: '',
-        model: '',
-        serial: '',
-        type_printing: '',
-        connectivity: '',
-        page_counter: '',
-        capacity: '',
-        status: 'Operativa',
-        description: '',
-        length: '',
-        assigned_to: ''
-      };
-    });
 
-    const handleSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
-      
-      const payload = {
-        company_id: selectedCompany?.id,
-        section_id: selectedSection,
-        type: compType,
-        responsible: formData.responsible,
-        brand: formData.brand,
-        model: formData.model,
-        serial: formData.serial,
-        status: formData.status,
-        hw_data: {
-          type_printing: formData.type_printing,
-          connectivity: formData.connectivity,
-          page_counter: formData.page_counter,
-          capacity: formData.capacity,
-          length: formData.length,
-          assigned_to: formData.assigned_to
-        },
-        description: formData.description
-      };
-
-      let error;
-      if (editingEquipment) {
-        (payload.hw_data as any).last_updated_at = new Date().toISOString();
-        const res = await supabase.from('it_equipment').update(payload).eq('id', editingEquipment.id);
-        error = res.error;
-      } else {
-        const res = await supabase.from('it_equipment').insert([payload]);
-        error = res.error;
-      }
-
-      if (!error) {
-        setEditingEquipment(null);
-        setView('company_details');
-        if (selectedCompany) fetchCompanyData(selectedCompany);
-        if (view === 'all_inventory') fetchAllEquipment();
-      }
-    };
-
-    return (
-      <form onSubmit={handleSubmit} className="space-y-6 bg-white p-8 rounded-3xl shadow-xl max-w-2xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h2 className="text-xl font-black text-slate-900 uppercase">{editingEquipment ? `Editar ${compType}` : `Agregar ${compType}`}</h2>
-          <button type="button" onClick={() => { setEditingEquipment(null); setView('company_details'); }} className="text-slate-400">Cerrar</button>
-        </div>
-
-        <select 
-          required
-          value={selectedSection}
-          onChange={(e) => setSelectedSection(e.target.value)}
-          className="w-full bg-slate-50 p-4 rounded-xl font-bold"
-        >
-          <option value="">Seleccionar Departamento...</option>
-          {sections.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-        </select>
-
-        <input placeholder="Responsable" required value={formData.responsible} onChange={e => setFormData({...formData, responsible: e.target.value})} className="w-full border p-4 rounded-xl font-bold" />
-        <div className="grid grid-cols-2 gap-4">
-          <input placeholder="Marca" value={formData.brand} onChange={e => setFormData({...formData, brand: e.target.value})} className="border p-4 rounded-xl font-bold" />
-          <input placeholder="Modelo" value={formData.model} onChange={e => setFormData({...formData, model: e.target.value})} className="border p-4 rounded-xl font-bold" />
-        </div>
-        <input placeholder="Serial" value={formData.serial} onChange={e => setFormData({...formData, serial: e.target.value})} className="w-full border p-4 rounded-xl font-bold" />
-
-        {compType === 'Impresora' && (
-          <div className="grid grid-cols-2 gap-4">
-            <select value={formData.type_printing} onChange={e => setFormData({...formData, type_printing: e.target.value})} className="border p-4 rounded-xl font-bold">
-              <option value="">Tipo Impresión</option>
-              {['Inyección de tinta', 'Láser', 'Térmica'].map(o => <option key={o}>{o}</option>)}
-            </select>
-            <input placeholder="Conectividad (USB, Wi-Fi)" value={formData.connectivity} onChange={e => setFormData({...formData, connectivity: e.target.value})} className="border p-4 rounded-xl font-bold" />
-          </div>
-        )}
-
-        {compType === 'UPS' && (
-          <div className="grid grid-cols-2 gap-4">
-            <input placeholder="Capacidad (VA/Watts)" value={formData.capacity} onChange={e => setFormData({...formData, capacity: e.target.value})} className="border p-4 rounded-xl font-bold" />
-            <select value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} className="border p-4 rounded-xl font-bold">
-              {['Operativa', 'Nueva', 'Requiere cambio'].map(o => <option key={o}>{o}</option>)}
-            </select>
-          </div>
-        )}
-
-        {compType === 'Cable/Adaptador' && (
-          <div className="grid grid-cols-2 gap-4">
-            <input placeholder="Longitud (metros)" value={formData.length} onChange={e => setFormData({...formData, length: e.target.value})} className="border p-4 rounded-xl font-bold" />
-            <input placeholder="Asignado a (Puesto)" value={formData.assigned_to} onChange={e => setFormData({...formData, assigned_to: e.target.value})} className="border p-4 rounded-xl font-bold" />
-          </div>
-        )}
-
-        <textarea placeholder="Observaciones" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full border p-4 rounded-xl font-bold h-32" />
-
-        <button className="w-full bg-blue-600 text-white p-4 rounded-xl font-bold uppercase">Guardar Componente</button>
-      </form>
-    );
-  };
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 sm:p-8">
@@ -1202,8 +1681,42 @@ const ITTools: React.FC<{ user: any }> = ({ user }) => {
           </div>
         )}
 
-        {view === 'form_pc' && <PCForm />}
-        {view === 'form_component' && <ComponentForm />}
+        {view === 'form_pc' && (() => {
+          const PCComp: any = PCForm;
+          return (
+            <PCComp 
+              editingEquipment={editingEquipment}
+              selectedCompany={selectedCompany}
+              sections={sections}
+              setEditingEquipment={setEditingEquipment}
+              setView={setView}
+              selectedSection={selectedSection}
+              setSelectedSection={setSelectedSection}
+              fetchCompanyData={fetchCompanyData}
+              fetchAllEquipment={fetchAllEquipment}
+              view={view}
+              equipment={equipment}
+            />
+          );
+        })()}
+        {view === 'form_component' && (() => {
+          const CompComp: any = ComponentForm;
+          return (
+            <CompComp 
+              editingEquipment={editingEquipment}
+              selectedCompany={selectedCompany}
+              sections={sections}
+              setEditingEquipment={setEditingEquipment}
+              setView={setView}
+              selectedSection={selectedSection}
+              setSelectedSection={setSelectedSection}
+              compType={compType}
+              fetchCompanyData={fetchCompanyData}
+              fetchAllEquipment={fetchAllEquipment}
+              view={view}
+            />
+          );
+        })()}
 
         {view === 'manage_sections' && selectedCompany && (
           <div className="bg-white rounded-3xl p-8 shadow-xl max-w-4xl mx-auto mt-8">
